@@ -7,6 +7,8 @@ import { obtenerPlanillas, type Planilla } from "@/lib/asistencias-demo";
 
 const ANIOS = [1, 2, 3, 4];
 
+export const instant = false;
+
 export default function DashboardPage() {
   const [usuario, setUsuario] = useState<Profesor | null>(null);
   const [planillas, setPlanillas] = useState<Planilla[]>([]);
