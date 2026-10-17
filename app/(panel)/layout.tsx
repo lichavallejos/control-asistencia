@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import { obtenerUsuario } from "@/lib/sesion";
+import { restaurarUsuario } from "@/lib/sesion";
 
 const items = [
   { ruta: "/dashboard", id: "dashboard", icono: "🏠", texto: "Inicio" },
@@ -10,8 +10,6 @@ const items = [
   { ruta: "/alumnos", id: "alumnos", icono: "👥", texto: "Alumnos" },
   { ruta: "/usuario", id: "usuario", icono: "👤", texto: "Perfil" },
 ];
-
-
 
 export default function PanelLayout({
   children,
@@ -23,12 +21,16 @@ export default function PanelLayout({
   const [nombre, setNombre] = useState<string | null>(null);
 
   useEffect(() => {
-    const usuario = obtenerUsuario();
-    if (!usuario) {
-      router.replace("/");
-    } else {
-      setNombre(usuario.nombre);
-    }
+    // Verifica con Supabase que la sesión siga vigente
+    restaurarUsuario()
+      .then((usuario) => {
+        if (!usuario) {
+          router.replace("/");
+        } else {
+          setNombre(usuario.nombre);
+        }
+      })
+      .catch(() => router.replace("/"));
   }, [router]);
 
   // Mientras se verifica la sesión no se muestra nada

@@ -15,8 +15,8 @@ export default function UsuarioPage() {
     .map((c) => `${c.nombre} (${c.anio || 1}.º Año)`)
     .join(", ");
 
-  function salir() {
-    cerrarSesion();
+  async function salir() {
+    await cerrarSesion();
     router.push("/");
   }
 

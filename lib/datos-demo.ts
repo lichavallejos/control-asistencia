@@ -1,11 +1,10 @@
 // DATOS DE PRUEBA copiados de asistencia.html.
-// Es temporal: en el paso de Supabase se reemplaza por la base de datos real.
+// Es temporal: en el paso 16 se reemplaza por la base de datos real (Supabase).
 
 export type Profesor = {
   id: number;
-  usuario: string;
-  password: string;
-  nombre: string;
+  usuario: string; // se completa con el correo de la sesión real
+  nombre: string; // se completa con el nombre de la sesión real
   materias: number[];
 };
 
@@ -27,12 +26,12 @@ export type RegistroAsistencia = {
   fecha: string;
 };
 
+// Plantilla con las materias de prueba. Ya no guarda usuarios ni contraseñas.
 export const profesores: Profesor[] = [
   {
     id: 1,
-    usuario: "licha2026",
-    password: "123",
-    nombre: "Lisandro Vallejos",
+    usuario: "",
+    nombre: "",
     materias: [101, 102, 103, 104, 105],
   },
 ];

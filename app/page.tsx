@@ -7,18 +7,27 @@ import { iniciarSesion } from "@/lib/sesion";
 export default function LoginPage() {
   const router = useRouter();
   const [error, setError] = useState("");
+  const [enviando, setEnviando] = useState(false);
 
-  function manejarEnvio(e: React.FormEvent<HTMLFormElement>) {
+  async function manejarEnvio(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const datos = new FormData(e.currentTarget);
-    const usuario = String(datos.get("username") ?? "").trim();
-    const password = String(datos.get("password") ?? "").trim();
+    const email = String(datos.get("username") ?? "").trim();
+    const password = String(datos.get("password") ?? "");
 
-    const profe = iniciarSesion(usuario, password);
-    if (profe) {
-      router.push("/dashboard");
-    } else {
-      setError("Usuario o contraseña incorrectos.");
+    setError("");
+    setEnviando(true);
+    try {
+      const resultado = await iniciarSesion(email, password);
+      if (resultado.ok) {
+        router.push("/dashboard");
+      } else {
+        setError(resultado.error);
+      }
+    } catch {
+      setError("No se pudo conectar. Revisá tu conexión e intentá de nuevo.");
+    } finally {
+      setEnviando(false);
     }
   }
 
@@ -33,12 +42,13 @@ export default function LoginPage() {
 
           <div className="Formulario">
             <form onSubmit={manejarEnvio}>
-              <label htmlFor="username">Usuario</label>
+              <label htmlFor="username">Correo electrónico</label>
               <input
                 type="text"
                 id="username"
                 name="username"
-                placeholder="Ingrese su usuario"
+                inputMode="email"
+                placeholder="Ingrese su correo"
                 autoComplete="username"
                 required
               />
@@ -53,22 +63,18 @@ export default function LoginPage() {
                 required
               />
 
-              <input type="submit" className="btn" value="Enviar" />
+              <input
+                type="submit"
+                className="btn"
+                value={enviando ? "Ingresando..." : "Enviar"}
+                disabled={enviando}
+              />
               <div className="separador">
                 <span></span>
                 <p>o</p>
                 <span></span>
               </div>
               <p id="login-error" className="error-msg">{error}</p>
-              <p
-                style={{
-                  fontSize: "0.75rem",
-                  color: "var(--text-muted)",
-                  textAlign: "center",
-                }}
-              >
-                Credenciales demo: <strong>profe_inicial</strong> / <strong>123</strong>
-              </p>
             </form>
           </div>
         </div>
