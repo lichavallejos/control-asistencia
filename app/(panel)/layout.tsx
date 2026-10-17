@@ -39,7 +39,7 @@ export default function PanelLayout({
   return (
     <div id="app-view" className="view active">
       <div className="app-bar">
-        <h2>Profesorado Inicial</h2>
+        <h2>Gestor de Asistencia</h2>
         <span className="user-badge">{nombre}</span>
       </div>
 
