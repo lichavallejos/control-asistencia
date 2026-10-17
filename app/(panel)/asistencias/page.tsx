@@ -8,12 +8,17 @@ import {
   obtenerAsistenciaDeClase,
   obtenerClases,
   obtenerMisMaterias,
+  obtenerResumenAsistencia,
   type AlumnoDeMateria,
   type ClaseGuardada,
   type EstadoAsistencia,
   type Materia,
   type RegistroAsistencia,
 } from "@/lib/datos";
+import { obtenerUsuario } from "@/lib/sesion";
+import InformeAsistencia, {
+  type DatosInforme,
+} from "@/components/attendance/InformeAsistencia";
 
 const ANIOS = [1, 2, 3, 4];
 
@@ -59,6 +64,7 @@ export default function AsistenciasPage() {
   const [registros, setRegistros] = useState<Registros>({});
   const [historialAbierto, setHistorialAbierto] = useState(false);
   const [ocupado, setOcupado] = useState(false);
+  const [informe, setInforme] = useState<DatosInforme | null>(null);
 
   // Evita que una respuesta lenta pise a una más nueva al cambiar de fecha rápido
   const ultimaSolicitud = useRef(0);
@@ -90,6 +96,50 @@ export default function AsistenciasPage() {
     const guardados = await obtenerAsistenciaDeClase(m.id, f);
     if (numero !== ultimaSolicitud.current) return;
     setRegistros(armarRegistros(lista, guardados));
+  }
+
+  // Cuando el informe ya está dibujado, abre el diálogo de impresión / guardar como PDF
+  useEffect(() => {
+    if (!informe) return;
+    const limpiar = () => setInforme(null);
+    window.addEventListener("afterprint", limpiar);
+    const espera = setTimeout(() => window.print(), 150);
+    return () => {
+      clearTimeout(espera);
+      window.removeEventListener("afterprint", limpiar);
+    };
+  }, [informe]);
+
+  async function exportarPDF() {
+    if (!materia) return;
+    setOcupado(true);
+    try {
+      const resumen = await obtenerResumenAsistencia(materia.id);
+      if (resumen.totalClases === 0) {
+        alert("Guarda al menos una planilla de asistencia antes de exportar.");
+        return;
+      }
+      setInforme({
+        materia: materia.nombre,
+        anio: materia.anio,
+        docente: obtenerUsuario()?.nombre ?? "",
+        totalClases: resumen.totalClases,
+        filas: alumnos.map((a) => {
+          const c = resumen.porInscripcion[a.inscripcionId];
+          return {
+            nombre: a.nombre,
+            dni: a.dni,
+            presentes: c?.presentes ?? 0,
+            ausJustificadas: c?.ausJustificadas ?? 0,
+            ausInjustificadas: c?.ausInjustificadas ?? 0,
+          };
+        }),
+      });
+    } catch (e) {
+      alert((e as Error).message);
+    } finally {
+      setOcupado(false);
+    }
   }
 
   async function abrirMateria(m: Materia) {
@@ -156,7 +206,7 @@ export default function AsistenciasPage() {
     try {
       await guardarAsistencia(materia.id, fecha, Object.values(registros));
       setClases(await obtenerClases(materia.id));
-      alert("Planilla de asistencia guardada correctamente.");
+      alert("✅ Planilla de asistencia guardada correctamente.");
     } catch (e) {
       alert((e as Error).message);
     } finally {
@@ -222,7 +272,7 @@ export default function AsistenciasPage() {
               if (delAnio.length === 0) return null;
               return (
                 <div key={anio}>
-                  <div className="grupo-anio-header"> {anio}.º Año</div>
+                  <div className="grupo-anio-header">🎓 {anio}.º Año</div>
                   {delAnio.map((m) => (
                     <button
                       key={m.id}
@@ -230,7 +280,7 @@ export default function AsistenciasPage() {
                       onClick={() => abrirMateria(m)}
                       disabled={ocupado}
                     >
-                      <span> {m.nombre}</span>
+                      <span>📚 {m.nombre}</span>
                       <span>➔</span>
                     </button>
                   ))}
@@ -300,7 +350,7 @@ export default function AsistenciasPage() {
                         className="btn btn-outline btn-sm"
                         style={{ color: "var(--danger)" }}
                       >
-                        
+                        🗑️
                       </button>
                     </div>
                   </div>
@@ -435,8 +485,11 @@ export default function AsistenciasPage() {
             >
               {ocupado ? "Guardando..." : "Guardar Planilla del Día"}
             </button>
-            {/* Provisorio: abre el diálogo de impresión. El PDF real va en el paso 18 */}
-            <button onClick={() => window.print()} className="btn btn-primary">
+            <button
+              onClick={exportarPDF}
+              disabled={ocupado}
+              className="btn btn-primary"
+            >
               Imprimir / Guardar PDF
             </button>
             <button onClick={() => setMateria(null)} className="btn btn-outline">
@@ -445,6 +498,7 @@ export default function AsistenciasPage() {
           </div>
         </div>
       )}
+      {informe && <InformeAsistencia datos={informe} />}
     </section>
   );
 }

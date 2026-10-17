@@ -390,3 +390,153 @@ export async function obtenerEstadisticasMateria(
 
   return { totalClases: count ?? 0, presentesPorInscripcion };
 }
+
+// ---------- Importación desde el sistema anterior ----------
+
+export function normalizarTexto(t: string): string {
+  return t.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+export type AlumnoParaImportar = { nombre: string; dni: string };
+
+function enLotes<T>(lista: T[], tamano: number): T[][] {
+  const lotes: T[][] = [];
+  for (let i = 0; i < lista.length; i += tamano) lotes.push(lista.slice(i, i + tamano));
+  return lotes;
+}
+
+// Inscribe una lista de alumnos en una materia sin duplicar:
+// - si ya está inscripto (mismo DNI, o mismo nombre si no tiene DNI), lo saltea;
+// - si ya existe una persona con ese DNI, la reutiliza.
+export async function importarAlumnosEnMateria(
+  materiaId: string,
+  lista: AlumnoParaImportar[]
+): Promise<{ nuevos: number; yaEstaban: number }> {
+  const supabase = crearClienteNavegador();
+  const clave = (a: AlumnoParaImportar) =>
+    a.dni ? `d:${a.dni}` : `n:${normalizarTexto(a.nombre)}`;
+
+  const yaInscriptos = await obtenerAlumnosDeMateria(materiaId);
+  const clavesInscriptas = new Set(yaInscriptos.map((a) => clave(a)));
+
+  // Sin repetidos dentro de la propia lista y sin los que ya están
+  const vistos = new Set<string>();
+  const pendientes: AlumnoParaImportar[] = [];
+  for (const a of lista) {
+    const k = clave(a);
+    if (clavesInscriptas.has(k) || vistos.has(k)) continue;
+    vistos.add(k);
+    pendientes.push(a);
+  }
+  const yaEstaban = lista.length - pendientes.length;
+  if (pendientes.length === 0) return { nuevos: 0, yaEstaban };
+
+  // Personas que ya existen por DNI
+  const idPorClave = new Map<string, string>();
+  const dnis = pendientes.filter((a) => a.dni).map((a) => a.dni);
+  for (const lote of enLotes(dnis, 100)) {
+    const { data, error } = await supabase
+      .from("personas")
+      .select("id, dni")
+      .eq("tipo", "alumno")
+      .in("dni", lote);
+    if (error) throw aError(error, "No se pudo buscar a los alumnos existentes.");
+    (data as { id: string; dni: string }[]).forEach((p) =>
+      idPorClave.set(`d:${p.dni}`, p.id)
+    );
+  }
+
+  // Crear las personas que faltan
+  const aCrear = pendientes.filter((a) => !idPorClave.has(clave(a)));
+  if (aCrear.length > 0) {
+    const institucionId = await miInstitucionId();
+    for (const lote of enLotes(aCrear, 200)) {
+      const { data, error } = await supabase
+        .from("personas")
+        .insert(
+          lote.map((a) => ({
+            institucion_id: institucionId,
+            tipo: "alumno",
+            apellido_nombre: a.nombre,
+            dni: a.dni || null,
+          }))
+        )
+        .select("id");
+      if (error) throw aError(error, "No se pudo guardar a los alumnos.");
+      (data as { id: string }[]).forEach((p, i) => idPorClave.set(clave(lote[i]), p.id));
+    }
+  }
+
+  // Inscribirlos en la materia
+  for (const lote of enLotes(pendientes, 200)) {
+    const { error } = await supabase.from("inscripciones").insert(
+      lote.map((a) => ({
+        alumno_id: idPorClave.get(clave(a)) as string,
+        materia_id: materiaId,
+      }))
+    );
+    if (error) throw aError(error, "No se pudo inscribir a los alumnos.");
+  }
+
+  return { nuevos: pendientes.length, yaEstaban };
+}
+
+// ---------- Informe de asistencia (PDF) ----------
+
+export type ConteoAlumno = {
+  presentes: number;
+  ausJustificadas: number;
+  ausInjustificadas: number;
+};
+
+export type ResumenAsistencia = {
+  totalClases: number;
+  porInscripcion: Record<string, ConteoAlumno>;
+};
+
+// Cuenta presentes y ausencias (justificadas / injustificadas) de cada inscripción
+export function resumirAsistencias(
+  filas: { inscripcion_id: string; estado: string; motivo: string | null }[]
+): Record<string, ConteoAlumno> {
+  const resumen: Record<string, ConteoAlumno> = {};
+  for (const f of filas) {
+    const c = (resumen[f.inscripcion_id] ??= {
+      presentes: 0,
+      ausJustificadas: 0,
+      ausInjustificadas: 0,
+    });
+    if (f.estado === "presente") c.presentes++;
+    else if (f.motivo === "justificada") c.ausJustificadas++;
+    else c.ausInjustificadas++;
+  }
+  return resumen;
+}
+
+export async function obtenerResumenAsistencia(
+  materiaId: string
+): Promise<ResumenAsistencia> {
+  const supabase = crearClienteNavegador();
+
+  const { count, error } = await supabase
+    .from("clases")
+    .select("id", { count: "exact", head: true })
+    .eq("materia_id", materiaId);
+  if (error) throw aError(error, "No se pudo armar el informe.");
+
+  const filas = await leerTodo<{
+    inscripcion_id: string;
+    estado: string;
+    motivo: string | null;
+  }>(
+    (desde, hasta) =>
+      supabase
+        .from("asistencias")
+        .select("inscripcion_id, estado, motivo")
+        .eq("materia_id", materiaId)
+        .order("id")
+        .range(desde, hasta),
+    "No se pudo armar el informe."
+  );
+
+  return { totalClases: count ?? 0, porInscripcion: resumirAsistencias(filas) };
+}
