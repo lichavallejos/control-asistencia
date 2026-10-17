@@ -225,10 +225,12 @@
     /* ---------- IMPRESIÓN ---------- */
     #contenedor-impresion { display: none; }
 
-@page { size: A4; margin: 0; }
+    @page { size: A4; margin: 0; }
 
-@media print {
-  body > *:not(#contenedor-impresion) { display: none !important; }
-  body { min-height: 0 !important; height: auto !important; padding: 0 !important; margin: 0 !important; background: #fff !important; }
-  #contenedor-impresion { display: block !important; position: static !important; width: 100% !important; margin: 0 !important; padding: 15mm !important; box-sizing: border-box !important; }
-}
+    @media print {
+      body > *:not(#contenedor-impresion),
+      body > #app-view.active,
+      body > #login-view.active { display: none !important; }
+      body { display: block !important; min-height: 0 !important; height: auto !important; padding: 0 !important; margin: 0 !important; background: #fff !important; }
+      #contenedor-impresion { display: block !important; position: static !important; width: 100% !important; margin: 0 !important; padding: 15mm !important; box-sizing: border-box !important; }
+    }
