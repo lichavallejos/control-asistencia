@@ -1,9 +1,12 @@
 "use client";
 
-import { useState } from "react";
-import { obtenerUsuario } from "@/lib/sesion";
-import type { Curso } from "@/lib/datos-demo";
-import { obtenerAlumnos, obtenerMisCursos } from "@/lib/datos-local";
+import { useEffect, useState } from "react";
+import {
+  obtenerAlumnosDeMateria,
+  obtenerMisMaterias,
+  type AlumnoDeMateria,
+  type Materia,
+} from "@/lib/datos";
 import {
   eliminarPlanilla,
   guardarPlanilla,
@@ -14,7 +17,7 @@ import {
 
 const ANIOS = [1, 2, 3, 4];
 
-type Registros = Record<number, RegistroAlumno>;
+type Registros = Record<string, RegistroAlumno>;
 
 function hoy() {
   const d = new Date();
@@ -23,61 +26,86 @@ function hoy() {
   return `${d.getFullYear()}-${mes}-${dia}`;
 }
 
-// Arma el estado de cada alumno: usa la planilla guardada si existe,
-// y si no, todos presentes (igual que en el HTML original).
-function armarRegistros(cursoId: number, fecha: string): Registros {
-  const planilla = obtenerPlanilla(cursoId, fecha);
+// Usa la planilla guardada si existe; si no, todos presentes (como en el HTML original)
+function armarRegistros(
+  materiaId: string,
+  fecha: string,
+  alumnos: AlumnoDeMateria[]
+): Registros {
+  const planilla = obtenerPlanilla(materiaId, fecha);
   const resultado: Registros = {};
-  obtenerAlumnos()
-    .filter((a) => a.cursoId === cursoId)
-    .forEach((a) => {
-      const guardado = planilla?.registros.find((r) => r.alumnoId === a.id);
-      resultado[a.id] = {
-        alumnoId: a.id,
-        estado: guardado?.estado ?? "presente",
-        motivo: guardado?.motivo || "injustificada",
-        observacion: guardado?.observacion ?? "",
-      };
-    });
+  alumnos.forEach((a) => {
+    const guardado = planilla?.registros.find((r) => r.alumnoId === a.personaId);
+    resultado[a.personaId] = {
+      alumnoId: a.personaId,
+      estado: guardado?.estado ?? "presente",
+      motivo: guardado?.motivo || "injustificada",
+      observacion: guardado?.observacion ?? "",
+    };
+  });
   return resultado;
 }
 
 export default function AsistenciasPage() {
-  const [usuario] = useState(() => obtenerUsuario());
-  const [curso, setCurso] = useState<Curso | null>(null);
+  const [materias, setMaterias] = useState<Materia[]>([]);
+  const [cargando, setCargando] = useState(true);
+  const [error, setError] = useState("");
+
+  const [materia, setMateria] = useState<Materia | null>(null);
+  const [alumnos, setAlumnos] = useState<AlumnoDeMateria[]>([]);
   const [fecha, setFecha] = useState("");
   const [filtro, setFiltro] = useState("");
   const [registros, setRegistros] = useState<Registros>({});
   const [historialAbierto, setHistorialAbierto] = useState(false);
   const [planillas, setPlanillas] = useState(() => obtenerPlanillas());
 
-  if (!usuario) return null;
+  useEffect(() => {
+    let activo = true;
+    obtenerMisMaterias()
+      .then((lista) => {
+        if (!activo) return;
+        setMaterias(lista);
+        setCargando(false);
+      })
+      .catch((e: Error) => {
+        if (!activo) return;
+        setError(e.message);
+        setCargando(false);
+      });
+    return () => {
+      activo = false;
+    };
+  }, []);
 
-  const misCursos = obtenerMisCursos(usuario);
-
-  function abrirCurso(c: Curso) {
-    const f = hoy();
-    setCurso(c);
-    setFecha(f);
-    setFiltro("");
-    setHistorialAbierto(false);
-    setRegistros(armarRegistros(c.id, f));
+  async function abrirMateria(m: Materia) {
+    try {
+      const lista = await obtenerAlumnosDeMateria(m.id);
+      const f = hoy();
+      setAlumnos(lista);
+      setMateria(m);
+      setFecha(f);
+      setFiltro("");
+      setHistorialAbierto(false);
+      setRegistros(armarRegistros(m.id, f, lista));
+    } catch (e) {
+      alert((e as Error).message);
+    }
   }
 
   function cambiarFecha(f: string) {
     setFecha(f);
-    if (curso && f) setRegistros(armarRegistros(curso.id, f));
+    if (materia && f) setRegistros(armarRegistros(materia.id, f, alumnos));
   }
 
-  function setEstado(id: number, estado: "presente" | "ausente") {
+  function setEstado(id: string, estado: "presente" | "ausente") {
     setRegistros((prev) => ({ ...prev, [id]: { ...prev[id], estado } }));
   }
 
-  function setMotivo(id: number, motivo: string) {
+  function setMotivo(id: string, motivo: string) {
     setRegistros((prev) => ({ ...prev, [id]: { ...prev[id], motivo } }));
   }
 
-  function setObservacion(id: number, observacion: string) {
+  function setObservacion(id: string, observacion: string) {
     setRegistros((prev) => ({ ...prev, [id]: { ...prev[id], observacion } }));
   }
 
@@ -92,13 +120,13 @@ export default function AsistenciasPage() {
   }
 
   function guardar() {
-    if (!curso) return;
+    if (!materia) return;
     if (!fecha) {
       alert("Selecciona una fecha válida.");
       return;
     }
     guardarPlanilla({
-      cursoId: curso.id,
+      materiaId: materia.id,
       fecha,
       registros: Object.values(registros).map((r) => ({
         ...r,
@@ -110,11 +138,11 @@ export default function AsistenciasPage() {
   }
 
   function eliminarFecha(f: string) {
-    if (!curso) return;
+    if (!materia) return;
     if (confirm(`¿Eliminar la asistencia del día ${f}?`)) {
-      eliminarPlanilla(curso.id, f);
+      eliminarPlanilla(materia.id, f);
       setPlanillas(obtenerPlanillas());
-      if (f === fecha) setRegistros(armarRegistros(curso.id, fecha));
+      if (f === fecha) setRegistros(armarRegistros(materia.id, fecha, alumnos));
     }
   }
 
@@ -123,17 +151,14 @@ export default function AsistenciasPage() {
     setHistorialAbierto(false);
   }
 
-  const alumnosCurso = curso
-    ? obtenerAlumnos().filter(
-        (a) =>
-          a.cursoId === curso.id &&
-          a.nombre.toLowerCase().includes(filtro.toLowerCase())
-      )
-    : [];
+  const textoFiltro = filtro.toLowerCase();
+  const alumnosFiltrados = alumnos.filter((a) =>
+    a.nombre.toLowerCase().includes(textoFiltro)
+  );
 
-  const historialCurso = curso
+  const historialMateria = materia
     ? planillas
-        .filter((p) => p.cursoId === curso.id)
+        .filter((p) => p.materiaId === materia.id)
         .sort((a, b) => b.fecha.localeCompare(a.fecha))
     : [];
 
@@ -144,28 +169,40 @@ export default function AsistenciasPage() {
         <div className="section__line"></div>
       </div>
 
-      {!curso && (
+      {error && (
+        <p className="error-msg" style={{ marginBottom: "12px" }}>
+          {error}
+        </p>
+      )}
+
+      {!materia && (
         <div className="card">
           <div className="card-title">Selecciona una Materia</div>
           <div>
-            {misCursos.length === 0 && (
+            {cargando && (
               <p style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>
-                No tienes materias asignadas.
+                Cargando...
+              </p>
+            )}
+            {!cargando && materias.length === 0 && (
+              <p style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>
+                No tienes materias asignadas. Creá la primera desde la pestaña
+                Alumnos.
               </p>
             )}
             {ANIOS.map((anio) => {
-              const cursosAnio = misCursos.filter((c) => (c.anio || 1) === anio);
-              if (cursosAnio.length === 0) return null;
+              const delAnio = materias.filter((m) => m.anio === anio);
+              if (delAnio.length === 0) return null;
               return (
                 <div key={anio}>
                   <div className="grupo-anio-header">🎓 {anio}.º Año</div>
-                  {cursosAnio.map((c) => (
+                  {delAnio.map((m) => (
                     <button
-                      key={c.id}
+                      key={m.id}
                       className="btn btn-outline course-btn"
-                      onClick={() => abrirCurso(c)}
+                      onClick={() => abrirMateria(m)}
                     >
-                      <span>📚 {c.nombre}</span>
+                      <span>📚 {m.nombre}</span>
                       <span>➔</span>
                     </button>
                   ))}
@@ -176,13 +213,13 @@ export default function AsistenciasPage() {
         </div>
       )}
 
-      {curso && (
+      {materia && (
         <div className="card">
           <div className="card-title">
             <div>
-              <span>{curso.nombre}</span>
+              <span>{materia.nombre}</span>
               <span className="badge badge-anio" style={{ marginLeft: "6px" }}>
-                {curso.anio}.º Año
+                {materia.anio}.º Año
               </span>
             </div>
             <button
@@ -206,7 +243,7 @@ export default function AsistenciasPage() {
                 Clases Registradas Anteriores:
               </strong>
               <div>
-                {historialCurso.length === 0 && (
+                {historialMateria.length === 0 && (
                   <p
                     style={{
                       fontSize: "0.8rem",
@@ -217,7 +254,7 @@ export default function AsistenciasPage() {
                     No hay clases tomadas aún.
                   </p>
                 )}
-                {historialCurso.map((h) => (
+                {historialMateria.map((h) => (
                   <div className="historial-item" key={h.fecha}>
                     <span style={{ fontSize: "0.85rem", fontWeight: 600 }}>
                       📅 {h.fecha}
@@ -284,7 +321,7 @@ export default function AsistenciasPage() {
           </div>
 
           <div>
-            {alumnosCurso.length === 0 && (
+            {alumnosFiltrados.length === 0 && (
               <p
                 style={{
                   fontSize: "0.85rem",
@@ -295,14 +332,14 @@ export default function AsistenciasPage() {
                 No hay alumnos para mostrar.
               </p>
             )}
-            {alumnosCurso.map((a) => {
-              const reg = registros[a.id];
+            {alumnosFiltrados.map((a) => {
+              const reg = registros[a.personaId];
               if (!reg) return null;
               const esPresente = reg.estado === "presente";
               return (
                 <div
                   className="alumno-card"
-                  key={a.id}
+                  key={a.personaId}
                   data-estado={reg.estado}
                 >
                   <div className="alumno-info">
@@ -316,14 +353,14 @@ export default function AsistenciasPage() {
                     <button
                       type="button"
                       className={`btn-estado btn-estado-presente ${esPresente ? "active" : ""}`}
-                      onClick={() => setEstado(a.id, "presente")}
+                      onClick={() => setEstado(a.personaId, "presente")}
                     >
                       ➕ Presente
                     </button>
                     <button
                       type="button"
                       className={`btn-estado btn-estado-ausente ${!esPresente ? "active" : ""}`}
-                      onClick={() => setEstado(a.id, "ausente")}
+                      onClick={() => setEstado(a.personaId, "ausente")}
                     >
                       ✖ Ausente
                     </button>
@@ -332,7 +369,7 @@ export default function AsistenciasPage() {
                   {!esPresente && (
                     <select
                       value={reg.motivo}
-                      onChange={(e) => setMotivo(a.id, e.target.value)}
+                      onChange={(e) => setMotivo(a.personaId, e.target.value)}
                       style={{ borderColor: "var(--danger)", marginTop: "4px" }}
                     >
                       <option value="injustificada">Ausencia Injustificada</option>
@@ -343,7 +380,7 @@ export default function AsistenciasPage() {
                   <input
                     type="text"
                     value={reg.observacion}
-                    onChange={(e) => setObservacion(a.id, e.target.value)}
+                    onChange={(e) => setObservacion(a.personaId, e.target.value)}
                     placeholder="💬 Nota u observación rápida (opcional)..."
                     style={{ fontSize: "0.8rem", height: "34px" }}
                   />
@@ -367,7 +404,7 @@ export default function AsistenciasPage() {
             <button onClick={() => window.print()} className="btn btn-primary">
               Imprimir / Guardar PDF
             </button>
-            <button onClick={() => setCurso(null)} className="btn btn-outline">
+            <button onClick={() => setMateria(null)} className="btn btn-outline">
               Volver a Selección
             </button>
           </div>

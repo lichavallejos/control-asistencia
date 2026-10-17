@@ -1,19 +1,29 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { cerrarSesion, obtenerUsuario } from "@/lib/sesion";
-import { obtenerMisCursos } from "@/lib/datos-local";
+import { obtenerMisMaterias, type Materia } from "@/lib/datos";
 
 export default function UsuarioPage() {
   const router = useRouter();
   const [usuario] = useState(() => obtenerUsuario());
+  const [materias, setMaterias] = useState<Materia[] | null>(null);
+
+  useEffect(() => {
+    obtenerMisMaterias()
+      .then(setMaterias)
+      .catch(() => setMaterias([]));
+  }, []);
 
   if (!usuario) return null;
 
-  const materias = obtenerMisCursos(usuario)
-    .map((c) => `${c.nombre} (${c.anio || 1}.º Año)`)
-    .join(", ");
+  const textoMaterias =
+    materias === null
+      ? "Cargando..."
+      : materias.length === 0
+        ? "Todavía no tenés materias."
+        : materias.map((m) => `${m.nombre} (${m.anio}.º Año)`).join(", ");
 
   async function salir() {
     await cerrarSesion();
@@ -34,10 +44,10 @@ export default function UsuarioPage() {
             <strong>Nombre:</strong> {usuario.nombre}
           </p>
           <p style={{ marginBottom: "8px" }}>
-            <strong>Usuario:</strong> {usuario.usuario}
+            <strong>Correo:</strong> {usuario.email}
           </p>
           <p style={{ fontSize: "0.88rem", color: "var(--text-muted)" }}>
-            <strong>Materias:</strong> {materias}
+            <strong>Materias:</strong> {textoMaterias}
           </p>
         </div>
         <button

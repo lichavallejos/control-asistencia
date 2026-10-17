@@ -1,38 +1,50 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { obtenerUsuario } from "@/lib/sesion";
-import type { Profesor } from "@/lib/datos-demo";
-import { obtenerAlumnos, obtenerMisCursos } from "@/lib/datos-local";
+import {
+  contarAlumnosPorMateria,
+  obtenerMisMaterias,
+  type Materia,
+} from "@/lib/datos";
 import { obtenerPlanillas, type Planilla } from "@/lib/asistencias-demo";
 
 const ANIOS = [1, 2, 3, 4];
 
 export default function DashboardPage() {
-  const [usuario, setUsuario] = useState<Profesor | null>(null);
+  const [materias, setMaterias] = useState<Materia[]>([]);
+  const [conteo, setConteo] = useState<Record<string, number>>({});
   const [planillas, setPlanillas] = useState<Planilla[]>([]);
+  const [cargando, setCargando] = useState(true);
+  const [error, setError] = useState("");
 
   useEffect(() => {
-    setUsuario(obtenerUsuario());
-    setPlanillas(obtenerPlanillas());
+    let activo = true;
+    Promise.all([obtenerMisMaterias(), contarAlumnosPorMateria()])
+      .then(([m, c]) => {
+        if (!activo) return;
+        setMaterias(m);
+        setConteo(c);
+        setPlanillas(obtenerPlanillas());
+        setCargando(false);
+      })
+      .catch((e: Error) => {
+        if (!activo) return;
+        setError(e.message);
+        setCargando(false);
+      });
+    return () => {
+      activo = false;
+    };
   }, []);
 
-  if (!usuario) return null;
-
-  const misCursos = obtenerMisCursos(usuario);
-  const alumnos = obtenerAlumnos();
-  const idsMis = misCursos.map((c) => c.id);
+  const ids = materias.map((m) => m.id);
+  const totalAlumnos = ids.reduce((suma, id) => suma + (conteo[id] ?? 0), 0);
+  const totalClases = planillas.filter((p) => ids.includes(p.materiaId)).length;
 
   const stats = [
-    [misCursos.length, "materias a cargo"],
-    [
-      alumnos.filter((a) => idsMis.includes(a.cursoId)).length,
-      "estudiantes inscriptos",
-    ],
-    [
-      planillas.filter((h) => idsMis.includes(h.cursoId)).length,
-      "clases registradas",
-    ],
+    [materias.length, "materias a cargo"],
+    [totalAlumnos, "estudiantes inscriptos"],
+    [totalClases, "clases registradas"],
   ] as const;
 
   return (
@@ -42,10 +54,16 @@ export default function DashboardPage() {
         <div className="section__line"></div>
       </div>
 
+      {error && (
+        <p className="error-msg" style={{ marginBottom: "12px" }}>
+          {error}
+        </p>
+      )}
+
       <div className="stats-grid">
         {stats.map(([n, t]) => (
           <div className="stat" key={t}>
-            <div className="stat__number">{n}</div>
+            <div className="stat__number">{cargando ? "…" : n}</div>
             <div className="stat__label">{t}</div>
           </div>
         ))}
@@ -54,29 +72,33 @@ export default function DashboardPage() {
       <div className="card">
         <div className="card-title">Resumen por Año y Materia</div>
         <div>
-          {misCursos.length === 0 && (
+          {cargando && (
             <p style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>
-              No hay materias registradas.
+              Cargando...
+            </p>
+          )}
+          {!cargando && materias.length === 0 && (
+            <p style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>
+              No hay materias registradas. Creá la primera desde la pestaña
+              Alumnos.
             </p>
           )}
           {ANIOS.map((anio) => {
-            const cursosAnio = misCursos.filter((c) => (c.anio || 1) === anio);
-            if (cursosAnio.length === 0) return null;
+            const delAnio = materias.filter((m) => m.anio === anio);
+            if (delAnio.length === 0) return null;
             return (
               <div key={anio}>
                 <div className="grupo-anio-header">🎓 {anio}.º Año</div>
-                {cursosAnio.map((c) => {
-                  const cantAlumnos = alumnos.filter(
-                    (a) => a.cursoId === c.id
-                  ).length;
+                {delAnio.map((m) => {
                   const clases = planillas.filter(
-                    (h) => h.cursoId === c.id
+                    (p) => p.materiaId === m.id
                   ).length;
                   return (
-                    <div className="materia-row" key={c.id}>
-                      <strong>{c.nombre}</strong>
+                    <div className="materia-row" key={m.id}>
+                      <strong>{m.nombre}</strong>
                       <div className="materia-meta">
-                        👥 {cantAlumnos} Inscriptos | 📅 {clases} Clases registradas
+                        👥 {conteo[m.id] ?? 0} Inscriptos | 📅 {clases} Clases
+                        registradas
                       </div>
                     </div>
                   );

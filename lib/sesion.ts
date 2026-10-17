@@ -1,30 +1,27 @@
 // Sesión REAL con Supabase Auth.
-// Las materias y alumnos siguen siendo de prueba hasta el paso 16.
 
 import { crearClienteNavegador } from "./supabase/client";
-import { profesores, type Profesor } from "./datos-demo";
 
 const CLAVE_CACHE = "isfd_perfil";
 
-type Perfil = { nombre: string; email: string };
+export type Usuario = { nombre: string; email: string };
 
-function guardarPerfil(perfil: Perfil) {
+function guardarPerfil(perfil: Usuario) {
   sessionStorage.setItem(CLAVE_CACHE, JSON.stringify(perfil));
 }
 
-function leerPerfil(): Perfil | null {
+function leerPerfil(): Usuario | null {
   try {
     const datos = sessionStorage.getItem(CLAVE_CACHE);
-    return datos ? (JSON.parse(datos) as Perfil) : null;
+    return datos ? (JSON.parse(datos) as Usuario) : null;
   } catch {
     return null;
   }
 }
 
 // Busca la ficha del profesor en la tabla "personas" (la protegen las políticas RLS)
-async function cargarPerfil(userId: string, emailSesion: string): Promise<Perfil | null> {
-  const supabase = crearClienteNavegador();
-  const { data, error } = await supabase
+async function cargarPerfil(userId: string, emailSesion: string): Promise<Usuario | null> {
+  const { data, error } = await crearClienteNavegador()
     .from("personas")
     .select("apellido_nombre, email")
     .eq("user_id", userId)
@@ -62,14 +59,12 @@ export async function iniciarSesion(
 }
 
 // Datos del usuario para las pantallas (lectura inmediata desde el navegador)
-export function obtenerUsuario(): Profesor | null {
-  const perfil = leerPerfil();
-  if (!perfil) return null;
-  return { ...profesores[0], nombre: perfil.nombre, usuario: perfil.email };
+export function obtenerUsuario(): Usuario | null {
+  return leerPerfil();
 }
 
 // Verifica con Supabase que la sesión siga vigente y recupera el perfil si hace falta.
-export async function restaurarUsuario(): Promise<Profesor | null> {
+export async function restaurarUsuario(): Promise<Usuario | null> {
   const supabase = crearClienteNavegador();
   const { data, error } = await supabase.auth.getUser();
   if (error || !data.user) {

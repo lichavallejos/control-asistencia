@@ -1,26 +1,30 @@
 "use client";
 
-import { useState } from "react";
-import { obtenerUsuario } from "@/lib/sesion";
+import { useEffect, useState } from "react";
 import {
-  crearAlumno,
+  agregarAlumno,
   crearMateria,
   editarAlumno,
-  eliminarAlumno,
   matricularLista,
-  obtenerAlumnos,
-  obtenerMisCursos,
-} from "@/lib/datos-local";
+  obtenerAlumnosDeMateria,
+  obtenerMisMaterias,
+  quitarAlumnoDeMateria,
+  type AlumnoDeMateria,
+  type Materia,
+} from "@/lib/datos";
 import { obtenerPlanillas } from "@/lib/asistencias-demo";
 
 const ANIOS = [1, 2, 3, 4];
 
-type FormAlumno = { id: number | null; nombre: string; dni: string };
+type FormAlumno = { personaId: string | null; nombre: string; dni: string };
 
 export default function AlumnosPage() {
-  const [usuario] = useState(() => obtenerUsuario());
-  const [, setTick] = useState(0);
-  const [cursoElegido, setCursoElegido] = useState<number | null>(null);
+  const [materias, setMaterias] = useState<Materia[]>([]);
+  const [materiaId, setMateriaId] = useState<string | null>(null);
+  const [alumnos, setAlumnos] = useState<AlumnoDeMateria[]>([]);
+  const [cargando, setCargando] = useState(true);
+  const [error, setError] = useState("");
+  const [version, setVersion] = useState(0);
   const [filtro, setFiltro] = useState("");
 
   const [formMateriaAbierto, setFormMateriaAbierto] = useState(false);
@@ -30,79 +34,111 @@ export default function AlumnosPage() {
   const [formAlumno, setFormAlumno] = useState<FormAlumno | null>(null);
   const [cargaAbierta, setCargaAbierta] = useState(false);
   const [textoMasivo, setTextoMasivo] = useState("");
+  const [guardando, setGuardando] = useState(false);
 
-  if (!usuario) return null;
+  // Planillas guardadas en el navegador (hasta el paso 16b) para calcular el %
+  const [planillas] = useState(() => obtenerPlanillas());
 
-  // Fuerza a volver a leer los datos guardados
-  const refrescar = () => setTick((t) => t + 1);
+  // Cargar materias
+  useEffect(() => {
+    let activo = true;
+    obtenerMisMaterias()
+      .then((lista) => {
+        if (!activo) return;
+        setMaterias(lista);
+        setMateriaId((actual) => actual ?? lista[0]?.id ?? null);
+        setCargando(false);
+      })
+      .catch((e: Error) => {
+        if (!activo) return;
+        setError(e.message);
+        setCargando(false);
+      });
+    return () => {
+      activo = false;
+    };
+  }, [version]);
 
-  const misCursos = obtenerMisCursos(usuario);
-  const cursoId = cursoElegido ?? misCursos[0]?.id ?? null;
+  // Cargar alumnos de la materia elegida
+  useEffect(() => {
+    if (!materiaId) return;
+    let activo = true;
+    obtenerAlumnosDeMateria(materiaId)
+      .then((lista) => {
+        if (activo) setAlumnos(lista);
+      })
+      .catch((e: Error) => {
+        if (activo) setError(e.message);
+      });
+    return () => {
+      activo = false;
+    };
+  }, [materiaId, version]);
 
-  const textoFiltro = filtro.toLowerCase();
-  const alumnosCurso =
-    cursoId === null
-      ? []
-      : obtenerAlumnos().filter(
-          (a) =>
-            a.cursoId === cursoId &&
-            (a.nombre.toLowerCase().includes(textoFiltro) ||
-              a.dni.includes(textoFiltro))
-        );
+  const refrescar = () => setVersion((v) => v + 1);
 
-  const historialCurso =
-    cursoId === null
-      ? []
-      : obtenerPlanillas().filter((p) => p.cursoId === cursoId);
+  async function ejecutar(accion: () => Promise<void>) {
+    setGuardando(true);
+    try {
+      await accion();
+    } catch (e) {
+      alert((e as Error).message);
+    } finally {
+      setGuardando(false);
+    }
+  }
 
-  function guardarMateria() {
+  async function guardarMateria() {
     const nombre = materiaNombre.trim();
     if (!nombre) {
       alert("Ingresa el nombre de la materia.");
       return;
     }
-    const nueva = crearMateria(nombre, materiaAnio);
-    setMateriaNombre("");
-    setFormMateriaAbierto(false);
-    setCursoElegido(nueva.id);
-    refrescar();
-    alert(`✅ Materia '${nombre}' guardada para ${materiaAnio}.º Año.`);
+    await ejecutar(async () => {
+      const id = await crearMateria(nombre, materiaAnio);
+      setMateriaNombre("");
+      setFormMateriaAbierto(false);
+      setMateriaId(id);
+      refrescar();
+      alert(`✅ Materia '${nombre}' guardada para ${materiaAnio}.º Año.`);
+    });
   }
 
   function abrirNuevoAlumno() {
     setCargaAbierta(false);
-    setFormAlumno({ id: null, nombre: "", dni: "" });
+    setFormAlumno({ personaId: null, nombre: "", dni: "" });
   }
 
-  function abrirEditarAlumno(id: number) {
-    const al = obtenerAlumnos().find((a) => a.id === id);
-    if (!al) return;
+  function abrirEditarAlumno(a: AlumnoDeMateria) {
     setCargaAbierta(false);
-    setFormAlumno({ id: al.id, nombre: al.nombre, dni: al.dni || "" });
+    setFormAlumno({ personaId: a.personaId, nombre: a.nombre, dni: a.dni });
   }
 
-  function guardarAlumno() {
-    if (!formAlumno || cursoId === null) return;
+  async function guardarAlumno() {
+    if (!formAlumno || !materiaId) return;
     const nombre = formAlumno.nombre.trim();
     const dni = formAlumno.dni.trim();
     if (!nombre) {
       alert("Ingresa Apellido y Nombre.");
       return;
     }
-    if (formAlumno.id !== null) {
-      editarAlumno(formAlumno.id, nombre, dni);
-    } else {
-      crearAlumno(nombre, dni, cursoId);
-    }
-    setFormAlumno(null);
-    refrescar();
+    await ejecutar(async () => {
+      if (formAlumno.personaId) {
+        await editarAlumno(formAlumno.personaId, nombre, dni);
+      } else {
+        await agregarAlumno(nombre, dni, materiaId);
+      }
+      setFormAlumno(null);
+      refrescar();
+    });
   }
 
-  function borrarAlumno(id: number) {
-    if (confirm("¿Eliminar a este estudiante?")) {
-      eliminarAlumno(id);
+  async function quitarAlumno(a: AlumnoDeMateria) {
+    if (!confirm(`¿Quitar a ${a.nombre} de esta materia?`)) return;
+    await ejecutar(async () => {
+      await quitarAlumnoDeMateria(a.inscripcionId);
       refrescar();
-    }
+    });
   }
 
   function abrirCargaMasiva() {
@@ -111,8 +147,8 @@ export default function AlumnosPage() {
     setCargaAbierta(true);
   }
 
-  function guardarCargaMasiva() {
-    if (cursoId === null) return;
+  async function guardarCargaMasiva() {
+    if (!materiaId) return;
     const lineas = textoMasivo
       .split("\n")
       .map((l) => l.trim())
@@ -121,11 +157,20 @@ export default function AlumnosPage() {
       alert("Ingresa al menos un nombre de alumno.");
       return;
     }
-    const creados = matricularLista(lineas, cursoId);
-    alert(`✅ Se matricularon ${creados} alumnos correctamente.`);
-    setCargaAbierta(false);
-    refrescar();
+    await ejecutar(async () => {
+      const creados = await matricularLista(lineas, materiaId);
+      alert(`✅ Se matricularon ${creados} alumnos correctamente.`);
+      setCargaAbierta(false);
+      refrescar();
+    });
   }
+
+  const textoFiltro = filtro.toLowerCase();
+  const alumnosFiltrados = alumnos.filter(
+    (a) =>
+      a.nombre.toLowerCase().includes(textoFiltro) || a.dni.includes(textoFiltro)
+  );
+  const historialMateria = planillas.filter((p) => p.materiaId === materiaId);
 
   return (
     <section className="seccion active">
@@ -133,6 +178,12 @@ export default function AlumnosPage() {
         <h2 className="section__title">Materias y alumnos</h2>
         <div className="section__line"></div>
       </div>
+
+      {error && (
+        <p className="error-msg" style={{ marginBottom: "12px" }}>
+          {error}
+        </p>
+      )}
 
       <div className="card">
         <div className="card-title">
@@ -172,6 +223,7 @@ export default function AlumnosPage() {
             </div>
             <button
               onClick={guardarMateria}
+              disabled={guardando}
               className="btn btn-primary btn-sm"
               style={{ width: "100%" }}
             >
@@ -183,44 +235,53 @@ export default function AlumnosPage() {
 
       <div className="card">
         <div className="card-title">Gestión de Alumnos</div>
-        <div className="form-group">
-          <label htmlFor="select-curso-alumnos">Materia / Curso</label>
-          <select
-            id="select-curso-alumnos"
-            value={cursoId ?? ""}
-            onChange={(e) => setCursoElegido(Number(e.target.value))}
-          >
-            {ANIOS.map((anio) => {
-              const cursosAnio = misCursos.filter((c) => (c.anio || 1) === anio);
-              if (cursosAnio.length === 0) return null;
-              return (
-                <optgroup key={anio} label={`🎓 ${anio}.º Año`}>
-                  {cursosAnio.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.nombre}
-                    </option>
-                  ))}
-                </optgroup>
-              );
-            })}
-          </select>
-        </div>
-        <div style={{ display: "flex", gap: "8px" }}>
-          <button
-            onClick={abrirNuevoAlumno}
-            className="btn btn-success btn-sm"
-            style={{ flex: 1 }}
-          >
-            + Alumno Individual
-          </button>
-          <button
-            onClick={abrirCargaMasiva}
-            className="btn btn-primary btn-sm"
-            style={{ flex: 1 }}
-          >
-            Carga Masiva
-          </button>
-        </div>
+
+        {!cargando && materias.length === 0 ? (
+          <p style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>
+            Todavía no tenés materias. Creá la primera con “+ Crear Materia”.
+          </p>
+        ) : (
+          <>
+            <div className="form-group">
+              <label htmlFor="select-curso-alumnos">Materia / Curso</label>
+              <select
+                id="select-curso-alumnos"
+                value={materiaId ?? ""}
+                onChange={(e) => setMateriaId(e.target.value)}
+              >
+                {ANIOS.map((anio) => {
+                  const delAnio = materias.filter((m) => m.anio === anio);
+                  if (delAnio.length === 0) return null;
+                  return (
+                    <optgroup key={anio} label={`🎓 ${anio}.º Año`}>
+                      {delAnio.map((m) => (
+                        <option key={m.id} value={m.id}>
+                          {m.nombre}
+                        </option>
+                      ))}
+                    </optgroup>
+                  );
+                })}
+              </select>
+            </div>
+            <div style={{ display: "flex", gap: "8px" }}>
+              <button
+                onClick={abrirNuevoAlumno}
+                className="btn btn-success btn-sm"
+                style={{ flex: 1 }}
+              >
+                + Alumno Individual
+              </button>
+              <button
+                onClick={abrirCargaMasiva}
+                className="btn btn-primary btn-sm"
+                style={{ flex: 1 }}
+              >
+                Carga Masiva
+              </button>
+            </div>
+          </>
+        )}
       </div>
 
       {cargaAbierta && (
@@ -246,6 +307,7 @@ export default function AlumnosPage() {
           <div style={{ display: "flex", gap: "8px" }}>
             <button
               onClick={guardarCargaMasiva}
+              disabled={guardando}
               className="btn btn-primary"
               style={{ flex: 1 }}
             >
@@ -265,7 +327,9 @@ export default function AlumnosPage() {
       {formAlumno && (
         <div className="card" style={{ borderTopColor: "var(--accent)" }}>
           <div className="card-title">
-            {formAlumno.id === null ? "Agregar Alumno Nuevo" : "Editar Alumno"}
+            {formAlumno.personaId === null
+              ? "Agregar Alumno Nuevo"
+              : "Editar Alumno"}
           </div>
           <div className="form-group">
             <label htmlFor="alumno-nombre">Apellido y Nombre</label>
@@ -294,6 +358,7 @@ export default function AlumnosPage() {
           <div style={{ display: "flex", gap: "10px" }}>
             <button
               onClick={guardarAlumno}
+              disabled={guardando}
               className="btn btn-primary"
               style={{ flex: 1 }}
             >
@@ -310,71 +375,77 @@ export default function AlumnosPage() {
         </div>
       )}
 
-      <div className="card">
-        <div className="form-group">
-          <input
-            type="text"
-            placeholder="Filtrar por nombre o DNI..."
-            value={filtro}
-            onChange={(e) => setFiltro(e.target.value)}
-          />
-        </div>
-        <div>
-          {alumnosCurso.length === 0 && (
-            <p
-              style={{
-                fontSize: "0.85rem",
-                color: "var(--text-muted)",
-                padding: "8px 0",
-              }}
-            >
-              Sin alumnos registrados.
-            </p>
-          )}
-          {alumnosCurso.map((a) => {
-            const totalClases = historialCurso.length;
-            const presentes = historialCurso.filter((c) =>
-              c.registros.some(
-                (r) => r.alumnoId === a.id && r.estado === "presente"
-              )
-            ).length;
-            const pct =
-              totalClases > 0 ? Math.round((presentes / totalClases) * 100) : 100;
+      {materiaId && (
+        <div className="card">
+          <div className="form-group">
+            <input
+              type="text"
+              placeholder="Filtrar por nombre o DNI..."
+              value={filtro}
+              onChange={(e) => setFiltro(e.target.value)}
+            />
+          </div>
+          <div>
+            {alumnosFiltrados.length === 0 && (
+              <p
+                style={{
+                  fontSize: "0.85rem",
+                  color: "var(--text-muted)",
+                  padding: "8px 0",
+                }}
+              >
+                Sin alumnos registrados.
+              </p>
+            )}
+            {alumnosFiltrados.map((a) => {
+              const totalClases = historialMateria.length;
+              const presentes = historialMateria.filter((c) =>
+                c.registros.some(
+                  (r) => r.alumnoId === a.personaId && r.estado === "presente"
+                )
+              ).length;
+              const pct =
+                totalClases > 0
+                  ? Math.round((presentes / totalClases) * 100)
+                  : 100;
 
-            let badgeClass = "badge-success";
-            if (pct < 65) badgeClass = "badge-danger";
-            else if (pct < 75) badgeClass = "badge-warning";
+              let badgeClass = "badge-success";
+              if (pct < 65) badgeClass = "badge-danger";
+              else if (pct < 75) badgeClass = "badge-warning";
 
-            return (
-              <div className="alumno-card" key={a.id}>
-                <div className="alumno-info">
-                  <div>
-                    <span className="alumno-nombre">{a.nombre}</span>
-                    <div className="alumno-sub">DNI: {a.dni || "Sin datos"}</div>
+              return (
+                <div className="alumno-card" key={a.inscripcionId}>
+                  <div className="alumno-info">
+                    <div>
+                      <span className="alumno-nombre">{a.nombre}</span>
+                      <div className="alumno-sub">
+                        DNI: {a.dni || "Sin datos"}
+                      </div>
+                    </div>
+                    <span className={`badge ${badgeClass}`}>{pct}% Asist.</span>
                   </div>
-                  <span className={`badge ${badgeClass}`}>{pct}% Asist.</span>
+                  <div style={{ display: "flex", gap: "8px", marginTop: "6px" }}>
+                    <button
+                      onClick={() => abrirEditarAlumno(a)}
+                      className="btn btn-outline btn-sm"
+                      style={{ flex: 1 }}
+                    >
+                      ✏️ Editar
+                    </button>
+                    <button
+                      onClick={() => quitarAlumno(a)}
+                      className="btn btn-outline btn-sm"
+                      style={{ flex: 1, color: "var(--danger)" }}
+                    >
+                      🗑️ Quitar
+                    </button>
+                  </div>
                 </div>
-                <div style={{ display: "flex", gap: "8px", marginTop: "6px" }}>
-                  <button
-                    onClick={() => abrirEditarAlumno(a.id)}
-                    className="btn btn-outline btn-sm"
-                    style={{ flex: 1 }}
-                  >
-                    ✏️ Editar
-                  </button>
-                  <button
-                    onClick={() => borrarAlumno(a.id)}
-                    className="btn btn-outline btn-sm"
-                    style={{ flex: 1, color: "var(--danger)" }}
-                  >
-                    🗑️ Eliminar
-                  </button>
-                </div>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
-      </div>
+      )}
     </section>
   );
 }

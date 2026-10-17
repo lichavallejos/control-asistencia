@@ -1,20 +1,20 @@
 // Guarda las planillas de asistencia en el navegador (localStorage).
-// TEMPORAL: en el paso de Supabase se reemplaza por la tabla "asistencias".
+// TEMPORAL: en el paso 16b se reemplaza por las tablas "clases" y "asistencias".
 
 export type RegistroAlumno = {
-  alumnoId: number;
+  alumnoId: string; // id de la persona
   estado: "presente" | "ausente";
   motivo: string;
   observacion: string;
 };
 
 export type Planilla = {
-  cursoId: number;
+  materiaId: string;
   fecha: string; // formato AAAA-MM-DD
   registros: RegistroAlumno[];
 };
 
-const CLAVE = "isfd_planillas";
+const CLAVE = "isfd_planillas_v2";
 
 export function obtenerPlanillas(): Planilla[] {
   try {
@@ -25,23 +25,23 @@ export function obtenerPlanillas(): Planilla[] {
   }
 }
 
-export function obtenerPlanilla(cursoId: number, fecha: string): Planilla | null {
+export function obtenerPlanilla(materiaId: string, fecha: string): Planilla | null {
   return (
-    obtenerPlanillas().find((p) => p.cursoId === cursoId && p.fecha === fecha) ??
+    obtenerPlanillas().find((p) => p.materiaId === materiaId && p.fecha === fecha) ??
     null
   );
 }
 
 export function guardarPlanilla(planilla: Planilla) {
   const otras = obtenerPlanillas().filter(
-    (p) => !(p.cursoId === planilla.cursoId && p.fecha === planilla.fecha)
+    (p) => !(p.materiaId === planilla.materiaId && p.fecha === planilla.fecha)
   );
   localStorage.setItem(CLAVE, JSON.stringify([...otras, planilla]));
 }
 
-export function eliminarPlanilla(cursoId: number, fecha: string) {
+export function eliminarPlanilla(materiaId: string, fecha: string) {
   const resto = obtenerPlanillas().filter(
-    (p) => !(p.cursoId === cursoId && p.fecha === fecha)
+    (p) => !(p.materiaId === materiaId && p.fecha === fecha)
   );
   localStorage.setItem(CLAVE, JSON.stringify(resto));
 }
