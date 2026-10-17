@@ -1,0 +1,1214 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Sistema de Asistencia - Profesorado Inicial</title>
+
+  <!-- Configuración PWA e Iconos -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#0ab8a1">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Asistencia">
+  <link rel="apple-touch-icon" href="icon-192.png">
+
+  <!-- Mismas tipografías que home.html -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700;800&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+  <style>
+    /* ==============================
+       PALETA ISFD (tomada de style(2).css y alum.css)
+       ============================== */
+    :root {
+      --primary: #0ab8a1;
+      --primary-dark: #078a78;
+      --primary-darker: #054632;
+      --primary-light: #e6faf7;
+      --accent: #17d4ba;
+      --navy: #17106e;
+      --navy-dark: #0e0650;
+      --bg-color: #eef6f5;
+      --text-dark: #111827;
+      --text-muted: #6b7280;
+      --white: #FFFFFF;
+      --danger: #f52d2d;
+      --danger-light: #fff1f1;
+      --success: #0ab8a1;
+      --success-light: #e9f9f6;
+      --warning: #D99A1E;
+      --warning-light: #FBEFD2;
+      --border: #d1e8e4;
+      --radius: 6px;
+      --shadow: 0 4px 24px rgba(10, 184, 161, 0.10);
+      --font-title: "Playfair Display", Georgia, serif;
+      --font-body: "DM Sans", -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+    body {
+      font-family: var(--font-body);
+      background: var(--bg-color);
+      color: var(--text-dark);
+      overflow-x: hidden;
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+    }
+    button, input, select, textarea { font-family: inherit; }
+    :focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+    .view, .seccion { display: none !important; }
+    #app-view.active { display: flex !important; flex-direction: column; flex: 1; }
+    .seccion.active { display: block !important; }
+
+    /* ---------- HEADER (idéntico a style(2).css) ---------- */
+    .header { width: 100%; background: linear-gradient(90deg, var(--accent) 0%, var(--text-dark) 100%); padding: 0 2rem; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 2px 16px rgba(0,0,0,.18); position: sticky; top: 0; z-index: 100; min-height: 60px; }
+    .nav { display: flex; justify-content: center; align-items: center; background: linear-gradient(90deg, var(--primary-darker) 0%, var(--primary-dark) 100%); width: 100%; box-shadow: 0 3px 12px rgba(0,0,0,.15); }
+    .Menu { display: flex; list-style: none; gap: 0; }
+    .Menu li { display: flex; justify-content: center; }
+    .Menu a { display: flex; align-items: center; text-decoration: none; color: rgba(255,255,255,.85); font-weight: 500; font-size: 13.5px; letter-spacing: .04em; text-transform: uppercase; padding: 16px 26px; position: relative; transition: color .22s ease, background-color .22s ease; }
+    .Menu a::after { content: ""; position: absolute; bottom: 0; left: 50%; transform: translateX(-50%) scaleX(0); width: 60%; height: 2.5px; background: var(--accent); border-radius: 2px 2px 0 0; transition: transform .22s ease; }
+    .Menu a:hover { color: var(--white); background: rgba(255,255,255,.07); }
+    .Menu a:hover::after { transform: translateX(-50%) scaleX(1); }
+    .logo { display: flex; align-items: center; gap: 12px; }
+    .logoisfdm-img { width: 80px; height: auto; display: block; }
+    .title { color: var(--white); font-size: 1.15rem; letter-spacing: .01em; text-shadow: 0 1px 6px rgba(0,0,0,.2); }
+
+    /* ---------- LOGIN (idéntico a authlogeo + style(2).css) ---------- */
+    @keyframes slideUp { from { opacity: 0; transform: translateY(28px); } to { opacity: 1; transform: translateY(0); } }
+    body:has(#login-view.active) { align-items: center; justify-content: center; padding: 2rem 1rem; background-color: var(--bg-color); background-image: url("../../Control_de_Asistencia_2026/Public/imagen/AIEnhancer_isfd pation (2).png"); background-size: cover; background-position: center; position: relative; }
+    body:has(#login-view.active)::before { content: ""; position: fixed; inset: 0; background: linear-gradient(135deg, rgba(45,46,46,.55) 0%, rgba(23,16,110,.40) 100%); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); z-index: 0; }
+    body:has(#login-view.active) > :not(.header) { position: relative; z-index: 1; }
+    body:has(#login-view.active) .footer { width: 100%; }
+    #login-view.active { display: flex !important; width: 100%; justify-content: center; }
+    #login-view .wrapper { background: var(--white); border-radius: 20px; display: flex; flex-direction: row; align-items: stretch; width: 100%; max-width: 880px; margin: 2rem auto; box-shadow: 0 12px 48px rgba(10,184,161,.18); overflow: hidden; animation: slideUp .5s cubic-bezier(.22,1,.36,1) both; }
+    #login-view .content { background: var(--white); padding: 3rem 2.5rem; flex: 1 1 340px; display: flex; flex-direction: column; align-items: center; gap: 1.75rem; }
+    #login-view .imagen img { width: 90px; height: auto; display: block; }
+    #login-view .Formulario { width: 100%; }
+    #login-view form { display: flex; flex-direction: column; gap: 6px; }
+    #login-view label { margin-top: 12px; }
+    #login-view input[type="text"], #login-view input[type="password"] { padding: 11px 14px; border-radius: 6px; font-size: 14px; }
+    #login-view input::placeholder { color: #b0c4c1; }
+    #login-view .separador { display: flex; align-items: center; gap: 10px; margin: 4px 0; }
+    #login-view .separador span { flex: 1; height: 1px; background: var(--border); }
+    #login-view .separador p { font-size: 12px; font-weight: 500; color: var(--text-muted); letter-spacing: .05em; white-space: nowrap; }
+    #login-view .btn { position: relative; overflow: hidden; height: auto; width: 100%; padding: 12px; border: none; border-radius: 6px; font-size: 14.5px; font-weight: 600; letter-spacing: .03em; cursor: pointer; margin-top: 8px; color: var(--white); background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%); box-shadow: 0 3px 12px rgba(10,184,161,.3); transition: background-color .22s ease, transform .22s ease, box-shadow .22s ease; }
+    #login-view .btn::after { content: ""; position: absolute; inset: 0; background: rgba(255,255,255,0); transition: background .22s ease; }
+    #login-view .btn:hover { background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary-darker) 100%); transform: translateY(-1px); box-shadow: 0 6px 20px rgba(10,184,161,.38); }
+    #login-view .btn:hover::after { background: rgba(255,255,255,.1); }
+    #login-view .content2 { flex: 1 1 340px; overflow: hidden; display: flex; align-items: stretch; position: relative; }
+    #login-view .content2::after { content: ""; position: absolute; inset: 0; background: linear-gradient(160deg, rgba(10,184,161,.18) 0%, rgba(23,16,110,.22) 100%); pointer-events: none; }
+    #login-view .lado-imagen { width: 100%; overflow: hidden; display: flex; }
+    #login-view .imgderecha { width: 100%; height: 100%; object-fit: cover; display: block; min-height: 320px; transition: transform .6s cubic-bezier(.22,1,.36,1); }
+    #login-view .content2:hover .imgderecha { transform: scale(1.03); }
+    @media (max-width: 680px) {
+      #login-view .wrapper { flex-direction: column; align-items: center; }
+      #login-view .content, #login-view .content2 { flex: 1 1 auto; width: 100%; max-width: 460px; }
+      #login-view .content { padding: 2rem 1.5rem; }
+      #login-view .imgderecha { min-height: 200px; }
+    }
+
+    /* ---------- FORMULARIOS Y BOTONES ---------- */
+    .form-group { margin-bottom: 14px; }
+    label {
+      display: block; font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 6px;
+    }
+    input, select, textarea {
+      width: 100%; padding: 10px 14px; border: 1.5px solid var(--border); border-radius: var(--radius);
+      font-size: 0.95rem; background: #f8fffe; color: var(--text-dark); outline: none;
+      transition: border-color .22s, box-shadow .22s, background .22s;
+    }
+    input:focus, select:focus, textarea:focus { border-color: var(--primary); background: var(--white); box-shadow: 0 0 0 3px rgba(10,184,161,.12); }
+
+    .btn {
+      width: 100%; height: 46px; border: none; border-radius: var(--radius); font-size: 0.92rem; font-weight: 600;
+      cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+      transition: background .2s, transform .1s, box-shadow .2s;
+    }
+    .btn:active { transform: scale(0.98); }
+    .btn-primary { background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%); color: var(--white); box-shadow: 0 3px 12px rgba(10,184,161,.3); }
+    .btn-primary:hover { background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary-darker) 100%); }
+    .btn-success { background: linear-gradient(135deg, var(--navy) 0%, var(--navy-dark) 100%); color: var(--white); }
+    .btn-secondary { background: #64748B; color: var(--white); }
+    .btn-danger { background: linear-gradient(135deg, #f76060 0%, var(--danger) 100%); color: var(--white); }
+    .btn-outline { background: var(--white); border: 1.5px solid var(--border); color: var(--text-dark); }
+    .btn-outline:hover { border-color: var(--primary); color: var(--primary); }
+    .btn-sm { height: 36px; padding: 0 12px; font-size: 0.82rem; width: auto; }
+    .course-btn { justify-content: space-between; margin-bottom: 8px; padding: 0 16px; }
+    .error-msg { color: var(--danger); font-size: 0.85rem; text-align: center; margin-top: 8px; }
+
+    .btn-toggle-container { display: flex; gap: 10px; margin-top: 4px; }
+    .btn-estado {
+      flex: 1; height: 42px; border-radius: var(--radius); border: 1.5px solid var(--border); font-weight: 700; font-size: 0.9rem;
+      display: flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer; background: var(--white);
+      color: var(--text-muted); transition: all .2s ease;
+    }
+    .btn-estado-presente.active { background: var(--success); color: var(--white); border-color: var(--success); }
+    .btn-estado-ausente.active { background: var(--danger); color: var(--white); border-color: var(--danger); }
+
+    /* ---------- APP: BARRA DOCENTE + NAVEGACIÓN ---------- */
+    .app-bar {
+      background: linear-gradient(90deg, var(--primary-darker) 0%, var(--primary-dark) 100%); color: var(--white); padding: 12px 2rem; display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    }
+    .app-bar h2 { font-family: var(--font-title); font-size: 1.1rem; font-weight: 600; }
+    .user-badge { font-size: 0.8rem; background: rgba(255,255,255,.16); padding: 4px 12px; border-radius: 20px; font-weight: 600; }
+
+    .bottom-nav {
+      position: fixed; bottom: 0; left: 0; right: 0; height: 64px; background: var(--white); border-top: 3px solid var(--accent);
+      display: flex; justify-content: space-around; align-items: center; z-index: 100; box-shadow: 0 -4px 12px rgba(0,0,0,.06);
+    }
+    .nav-item { display: flex; flex-direction: column; align-items: center; justify-content: center; background: none; border: none; color: var(--text-muted); font-size: 0.72rem; font-weight: 500; width: 25%; height: 100%; gap: 3px; cursor: pointer; }
+    .nav-item .icon { font-size: 1.25rem; }
+    .nav-item.active { color: var(--primary); font-weight: 700; }
+
+    main { padding: 24px 16px 32px; max-width: 900px; margin: 0 auto; width: 100%; }
+
+    .section__header { margin-bottom: 18px; }
+    .section__title { font-family: var(--font-title); font-size: 1.7rem; font-weight: 700; color: var(--navy-dark); }
+    .section__line { width: 56px; height: 3px; background: linear-gradient(90deg, var(--primary), var(--accent)); border-radius: 2px; margin-top: 8px; }
+
+    .card { background: var(--white); border-radius: 12px; padding: 18px; margin-bottom: 16px; border: 1px solid var(--border); border-top: 3px solid var(--primary); box-shadow: var(--shadow); }
+    .card-title { font-size: 1rem; font-weight: 700; color: var(--navy-dark); margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+
+    .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 16px; }
+    .stat {
+      background: linear-gradient(135deg, var(--primary-darker) 0%, var(--primary) 55%, var(--navy) 100%); color: var(--white); border-radius: 12px; padding: 16px 12px; text-align: center;
+    }
+    .stat__number { font-family: var(--font-title); font-size: 2rem; font-weight: 700; color: var(--white); line-height: 1; }
+    .stat__label { font-size: 0.78rem; margin-top: 6px; opacity: .9; }
+
+    .grupo-anio-header { font-size: 0.88rem; font-weight: 700; color: var(--primary); background: var(--primary-light); border-left: 4px solid var(--accent); padding: 6px 12px; border-radius: 6px; margin: 14px 0 8px; display: flex; align-items: center; gap: 6px; }
+    .materia-row { padding: 8px 12px; border-bottom: 1px solid var(--border); }
+    .materia-row strong { color: var(--primary); }
+    .materia-meta { font-size: 0.82rem; color: var(--text-muted); margin-top: 2px; }
+
+    .alumno-card { background: var(--white); border: 1px solid var(--border); border-left: 4px solid var(--success); border-radius: 10px; padding: 12px; margin-bottom: 10px; display: flex; flex-direction: column; gap: 8px; }
+    .alumno-card[data-estado="ausente"] { border-left-color: var(--danger); }
+    .alumno-info { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+    .alumno-nombre { font-weight: 600; font-size: 0.95rem; }
+    .alumno-sub { font-size: 0.8rem; color: var(--text-muted); }
+
+    .badge { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 12px; font-size: 0.75rem; font-weight: 700; white-space: nowrap; }
+    .badge-success { background: var(--success-light); color: var(--primary-dark); }
+    .badge-warning { background: var(--warning-light); color: #8A5A0B; }
+    .badge-danger { background: var(--danger-light); color: #c0392b; }
+    .badge-anio { background: var(--primary-light); color: var(--primary); }
+
+    .quick-actions { display: flex; gap: 8px; margin-bottom: 12px; }
+    .historial-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); }
+
+    /* ---------- FOOTER (idéntico a style(2).css) ---------- */
+    .footer { background: #000; color: #8eaac0; margin-top: auto; }
+    .footer__grid { display: grid; grid-template-columns: 1.4fr 1fr 1fr 1fr; gap: 2rem; padding: 2.5rem 2rem 2rem; border-bottom: .5px solid rgba(255,255,255,.08); }
+    .footer__col h4 { font-size: 11px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: #f0f4f8; margin: 0 0 1rem; padding-bottom: .5rem; border-bottom: .5px solid rgba(255,255,255,.1); }
+    .footer__col ul { list-style: none; display: flex; flex-direction: column; gap: 7px; }
+    .footer a { color: #8eaac0; text-decoration: none; font-size: 13px; transition: color .22s ease; }
+    .footer a:hover { color: #d4e6f2; }
+    .footer__brand-logo-area { display: flex; align-items: center; gap: 12px; margin-bottom: 1rem; }
+    .footer__brand-img { width: 48px; height: auto; }
+    .footer__brand-name { font-size: 14px; font-weight: 600; color: #f0f4f8; }
+    .footer__brand-sub { font-size: 11px; color: #7a9ab8; letter-spacing: .06em; text-transform: uppercase; margin-top: 2px; }
+    .footer__descr { font-size: 13px; line-height: 1.7; margin-bottom: 1rem; }
+    .footer__socials { display: flex; flex-direction: column; gap: 6px; }
+    .footer__socials a { font-size: 12px; color: #7a9ab8; }
+    .footer__contact-item { display: flex; flex-direction: column; gap: 2px; margin-bottom: 12px; }
+    .footer__contact-label { font-size: 10px; text-transform: uppercase; letter-spacing: .1em; color: #4e7a9a; }
+    .footer__contact-value { font-size: 13px; }
+    .footer_bottom { padding: 1rem 2rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: .75rem; }
+    .footer_bottom span, .footer_bottom nav a { font-size: 12px; color: #4e6a7e; }
+    .footer_bottom nav { display: flex; gap: 1.5rem; flex-wrap: wrap; }
+    .footer_bottom nav a:hover { color: #8eaac0; }
+
+    /* ---------- RESPONSIVE ---------- */
+    @media (max-width: 899px) {
+      .nav { display: none; }
+      .footer__grid { grid-template-columns: 1fr 1fr; }
+      .title { font-size: 0.85rem; }
+      .header { padding: 6px 14px; }
+      body:has(#app-view.active) { padding-bottom: 64px; }
+      .stats-grid { gap: 8px; }
+      .stat__number { font-size: 1.6rem; }
+    }
+    @media (min-width: 900px) {
+      .bottom-nav { position: static; order: 1; height: 52px; justify-content: center; gap: 12px; border-top: none; border-bottom: 1px solid var(--border); box-shadow: none; }
+      .nav-item { flex-direction: row; width: auto; padding: 0 22px; gap: 8px; font-size: 0.9rem; border-bottom: 3px solid transparent; }
+      .nav-item.active { border-bottom-color: var(--accent); }
+      .app-bar { order: 0; }
+      main { order: 2; }
+    }
+    @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+
+    /* ---------- IMPRESIÓN ---------- */
+    @media print {
+      body * { visibility: hidden !important; }
+      #contenedor-impresion, #contenedor-impresion * { visibility: visible !important; }
+      #contenedor-impresion { position: absolute !important; left: 0 !important; top: 0 !important; width: 100% !important; padding: 0 !important; margin: 0 !important; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- HEADER INSTITUCIONAL -->
+  <header class="header">
+    <div class="logo">
+      <img src="../../Control_de_Asistencia_2026/Public/imagen/Logo-ISFD-Banderin-tricolor-01-500x500.png" alt="Logo ISFD Mercedes" class="logoisfdm-img">
+      <h1 class="title">Instituto Superior de Formación Docente Mercedes</h1>
+    </div>
+    <nav class="nav">
+      <ul class="Menu">
+        <li><a href="https://ifdmercedes-crr.infd.edu.ar/sitio/">WEB</a></li>
+        <li><a href="https://www.argentina.gob.ar/">Argentina</a></li>
+        <li><a href="https://mapa.infd.edu.ar/">MAPA</a></li>
+        <li><a href="https://red.infd.edu.ar/biblioteca-nuestra-escuela/">BIBLIOTECA</a></li>
+        <li><a href="#" onclick="if (usuarioActual) navegar('usuario'); return false;">Mi Perfil</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <!-- 1. PANTALLA DE LOGIN (misma estructura que authlogeo.html) -->
+  <div id="login-view" class="view active">
+    <div class="wrapper">
+      <div class="content">
+        <div class="imagen">
+          <img src="../../Control_de_Asistencia_2026/Public/imagen/40aniversarioblanco.png" alt="logo">
+          <label for="ISFD">ISFD Mercedes</label>
+        </div>
+
+        <div class="Formulario">
+          <form onsubmit="iniciarSesion(); return false;">
+            <label for="username">Usuario</label>
+            <input type="text" id="username" placeholder="Ingrese su usuario" autocomplete="username" required />
+
+            <label for="password">Contraseña</label>
+            <input type="password" id="password" placeholder="Ingrese su contraseña" autocomplete="current-password" required />
+
+            <input type="submit" class="btn" value="Enviar" />
+            <div class="separador">
+              <span></span>
+              <p>o</p>
+              <span></span>
+            </div>
+            <p id="login-error" class="error-msg"></p>
+            <p style="font-size: 0.75rem; color: var(--text-muted); text-align: center;">
+              Credenciales demo: <strong>profe_inicial</strong> / <strong>123</strong>
+            </p>
+          </form>
+        </div>
+      </div>
+
+      <div class="content2">
+        <div class="lado-imagen">
+          <img src="../../Control_de_Asistencia_2026/Public/imagen/Nuestroinstituto.png" alt="logoderecha" class="imgderecha">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. PANTALLA PRINCIPAL (APP) -->
+  <div id="app-view" class="view">
+    <div class="app-bar">
+      <h2>Profesorado Inicial</h2>
+      <span class="user-badge" id="header-user">Docente</span>
+    </div>
+
+    <main>
+      <!-- SECCIÓN: INICIO -->
+      <section id="dashboard-section" class="seccion active">
+        <div class="section__header"><h2 class="section__title">Panel docente</h2><div class="section__line"></div></div>
+
+        <div class="stats-grid" id="stats-container"></div>
+
+        <div class="card">
+          <div class="card-title">Resumen por Año y Materia</div>
+          <div id="resumen-container"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Noticias Institucionales</div>
+          <div id="noticias-container"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Copias de Seguridad y Datos</div>
+          <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 12px;">
+            Guarda una copia de respaldo de todas tus asistencias, materias y alumnos.
+          </p>
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            <button onclick="exportarBackup()" class="btn btn-outline btn-sm">📥 Descargar Backup (JSON)</button>
+            <label class="btn btn-outline btn-sm" style="margin: 0; cursor: pointer;">
+              📤 Restaurar Backup
+              <input type="file" id="input-backup" accept=".json" onchange="importarBackup(event)" style="display: none;">
+            </label>
+            <button onclick="reiniciarDatos()" class="btn btn-outline btn-sm" style="color: var(--danger); margin-top: 8px;">🗑️ Restablecer datos de fábrica</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- SECCIÓN: ASISTENCIA -->
+      <section id="asistencia-section" class="seccion">
+        <div class="section__header"><h2 class="section__title">Tomar asistencia</h2><div class="section__line"></div></div>
+
+        <div id="lista-cursos" class="card">
+          <div class="card-title">Selecciona una Materia</div>
+          <div id="cursos-container"></div>
+        </div>
+
+        <div id="toma-asistencia" class="card" style="display:none;">
+          <div class="card-title">
+            <div>
+              <span id="curso-titulo">Materia</span>
+              <span id="curso-anio-badge" class="badge badge-anio" style="margin-left: 6px;"></span>
+            </div>
+            <button onclick="alternarHistorialClases()" class="btn btn-outline btn-sm">Historial</button>
+          </div>
+
+          <div id="panel-historial-clases" style="display: none; background: var(--primary-light); padding: 12px; border-radius: 8px; margin-bottom: 14px;">
+            <strong style="font-size: 0.85rem; color: var(--primary);">Clases Registradas Anteriores:</strong>
+            <div id="lista-fechas-historial"></div>
+          </div>
+
+          <div class="form-group">
+            <label for="fecha-asistencia">Fecha de la Clase</label>
+            <input type="date" id="fecha-asistencia" onchange="cargarAsistenciaDeFecha()">
+          </div>
+
+          <div class="quick-actions">
+            <button onclick="marcarTodos('presente')" class="btn btn-outline btn-sm" style="flex: 1; color: var(--primary-dark); border-color: var(--success);">🟢 Todos Presentes</button>
+            <button onclick="marcarTodos('ausente')" class="btn btn-outline btn-sm" style="flex: 1; color: #c0392b; border-color: var(--danger);">🔴 Todos Ausentes</button>
+          </div>
+
+          <div class="form-group">
+            <input type="text" id="buscar-asistencia" placeholder="Buscar alumno..." oninput="filtrarAsistencia()">
+          </div>
+
+          <div id="lista-alumnos-asistencia"></div>
+
+          <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 16px;">
+            <button onclick="guardarAsistencia()" class="btn btn-success">Guardar Planilla del Día</button>
+            <button onclick="exportarPDF()" class="btn btn-primary">Imprimir / Guardar PDF</button>
+            <button onclick="volverACursos()" class="btn btn-outline">Volver a Selección</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- SECCIÓN: ALUMNOS Y MATERIAS -->
+      <section id="alumnos-section" class="seccion">
+        <div class="section__header"><h2 class="section__title">Materias y alumnos</h2><div class="section__line"></div></div>
+
+        <div class="card">
+          <div class="card-title">
+            <span>Nueva Materia</span>
+            <button onclick="alternarFormMateria()" class="btn btn-outline btn-sm"> + Crear Materia</button>
+          </div>
+          <div id="form-materia-card" style="display: none; margin-top: 10px;">
+            <div class="form-group">
+              <label for="nueva-materia-nombre">Nombre de la Materia</label>
+              <input type="text" id="nueva-materia-nombre" placeholder="Ej: Sujetos de la Educación">
+            </div>
+            <div class="form-group">
+              <label for="nueva-materia-anio">Año de Cursada</label>
+              <select id="nueva-materia-anio">
+                <option value="1">1.º Año</option>
+                <option value="2">2.º Año</option>
+                <option value="3">3.º Año</option>
+                <option value="4">4.º Año</option>
+              </select>
+            </div>
+            <button onclick="guardarNuevaMateria()" class="btn btn-primary btn-sm" style="width: 100%;">Guardar Materia</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Gestión de Alumnos</div>
+          <div class="form-group">
+            <label for="select-curso-alumnos">Materia / Curso</label>
+            <select id="select-curso-alumnos" onchange="renderizarGestionAlumnos()"></select>
+          </div>
+          <div style="display: flex; gap: 8px;">
+            <button onclick="prepararNuevoAlumno()" class="btn btn-success btn-sm" style="flex: 1;"> + Alumno Individual</button>
+            <button onclick="prepararCargaMasiva()" class="btn btn-primary btn-sm" style="flex: 1;">Carga Masiva</button>
+          </div>
+        </div>
+
+        <div id="form-carga-masiva-card" class="card" style="display: none; border-top-color: var(--accent);">
+          <div class="card-title">Carga Masiva (Copiar y Pegar)</div>
+          <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 8px;">Pega la lista de alumnos de esta materia (un nombre completo por línea):</p>
+          <div class="form-group">
+            <textarea id="texto-carga-masiva" rows="6" placeholder="Perez, Maria&#10;Gomez, Juan&#10;Lopez, Sofia"></textarea>
+          </div>
+          <div style="display: flex; gap: 8px;">
+            <button onclick="guardarCargaMasiva()" class="btn btn-primary" style="flex: 1;">Matricular Lista</button>
+            <button onclick="cancelarCargaMasiva()" class="btn btn-outline" style="flex: 1;">Cancelar</button>
+          </div>
+        </div>
+
+        <div id="form-alumno-card" class="card" style="display: none; border-top-color: var(--accent);">
+          <div class="card-title" id="form-alumno-titulo">Agregar Alumno</div>
+          <input type="hidden" id="alumno-edit-id">
+          <div class="form-group">
+            <label for="alumno-nombre">Apellido y Nombre</label>
+            <input type="text" id="alumno-nombre" placeholder="Ej: Perez, Maria">
+          </div>
+          <div class="form-group">
+            <label for="alumno-dni">DNI / Legajo</label>
+            <input type="text" id="alumno-dni" placeholder="Ej: 42123456">
+          </div>
+          <div style="display: flex; gap: 10px;">
+            <button onclick="guardarAlumno()" class="btn btn-primary" style="flex: 1;">Guardar</button>
+            <button onclick="cancelarFormAlumno()" class="btn btn-outline" style="flex: 1;">Cancelar</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="form-group">
+            <input type="text" id="buscar-alumno-abm" placeholder="Filtrar por nombre o DNI..." oninput="renderizarGestionAlumnos()">
+          </div>
+          <div id="lista-gestion-alumnos"></div>
+        </div>
+      </section>
+
+      <!-- SECCIÓN: PERFIL -->
+      <section id="usuario-section" class="seccion">
+        <div class="section__header"><h2 class="section__title">Mi perfil</h2><div class="section__line"></div></div>
+        <div class="card">
+          <div class="card-title">Perfil Docente</div>
+          <div id="perfil-docente-card"></div>
+          <button onclick="cerrarSesion()" class="btn btn-danger" style="margin-top: 20px;">Cerrar Sesión</button>
+        </div>
+      </section>
+    </main>
+
+    <!-- NAVEGACIÓN: barra inferior en móvil, pestañas en escritorio -->
+    <nav class="bottom-nav">
+      <button id="nav-dashboard" onclick="navegar('dashboard')" class="nav-item active"><span class="icon"></span><span>Inicio</span></button>
+      <button id="nav-asistencia" onclick="navegar('asistencia')" class="nav-item"><span class="icon"></span><span>Asistencia</span></button>
+      <button id="nav-alumnos" onclick="navegar('alumnos')" class="nav-item"><span class="icon"></span><span>Alumnos</span></button>
+      <button id="nav-usuario" onclick="navegar('usuario')" class="nav-item"><span class="icon"></span><span>Perfil</span></button>
+    </nav>
+  </div>
+
+  <!-- FOOTER (igual a authlogeo.html) -->
+  <footer class="footer">
+    <div class="footer__grid">
+      <div class="footer__col">
+        <div class="footer__brand-logo-area">
+          <img src="../../Control_de_Asistencia_2026/Public/imagen/isfdblancoy40ani.png" alt="Logo ISFD" class="footer__brand-img">
+          <div>
+            <p class="footer__brand-name">Instituto Superior de Formación Docente</p>
+            <p class="footer__brand-sub">Mercedes · Corrientes</p>
+          </div>
+        </div>
+        <p class="footer__descr">1986-2026</p>
+        <div class="footer__socials">
+          <a href="https://instagram.com/isfd_mercedes" target="_blank">Instagram: @isfd_mercedes</a>
+          <a href="https://facebook.com/ISFDMercedesCorrientes" target="_blank">Facebook: ISFDMercedesCorrientes</a>
+          <a href="mailto:ifdmercedes@hotmail.com">Correo: ifdmercedes@hotmail.com</a>
+        </div>
+      </div>
+
+      <div class="footer__col">
+        <h4>Institución</h4>
+        <ul>
+          <li><a href="#">Nuestra historia</a></li>
+          <li><a href="#">Autoridades</a></li>
+          <li><a href="#">Misión y visión</a></li>
+          <li><a href="#">Cuerpo docente</a></li>
+          <li><a href="#">Infraestructura</a></li>
+        </ul>
+      </div>
+
+      <div class="footer__col">
+        <h4>Servicios</h4>
+        <ul>
+          <li><a href="#">Carreras y planes de estudio</a></li>
+          <li><a href="#">Inscripciones</a></li>
+          <li><a href="#">Biblioteca</a></li>
+          <li><a href="#">Aula virtual</a></li>
+          <li><a href="#">Soporte técnico</a></li>
+        </ul>
+      </div>
+
+      <div class="footer__col">
+        <h4>Contacto</h4>
+        <div class="footer__contact-item">
+          <span class="footer__contact-label">Dirección</span>
+          <span class="footer__contact-value">José María Gómez y Yatay, Mercedes, Corrientes</span>
+        </div>
+        <div class="footer__contact-item">
+          <span class="footer__contact-label">Horario de atención</span>
+          <span class="footer__contact-value">Lun a Vie: 7:30 a 23:00 hs.</span>
+        </div>
+        <div class="footer__contact-item">
+          <span class="footer__contact-label">Correo institucional</span>
+          <span class="footer__contact-value"><a href="mailto:ifdmercedes@hotmail.com">ifdmercedes@hotmail.com</a></span>
+        </div>
+        <div class="footer__contact-item">
+          <span class="footer__contact-label">Soporte</span>
+          <span class="footer__contact-value"><a href="mailto:soporte@isfdmercedes.edu.ar">soporte@isfdmercedes.edu.ar</a></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer_bottom">
+      <span>© 2026 ISFD Mercedes · Todos los derechos reservados</span>
+      <nav>
+        <a href="#">Términos de uso</a>
+        <a href="#">Política de privacidad</a>
+        <a href="#">Accesibilidad</a>
+        <a href="#">Mapa del sitio</a>
+      </nav>
+    </div>
+  </footer>
+
+  <!-- 3. LÓGICA JAVASCRIPT CONECTADA CON BACKEND PHP -->
+  <script>
+    const defaultProfesores = [{ id: 1, usuario: "profe_inicial", password: "123", nombre: "Santiago Ponce", materias: [101, 102, 103, 104, 105] }];
+    
+    const defaultCursos = [
+      { id: 101, nombre: "Didáctica de la Educación Inicial", anio: 1 },
+      { id: 102, nombre: "Pedagogía General", anio: 1 },
+      { id: 103, nombre: "Psicología Educacional", anio: 2 },
+      { id: 104, nombre: "Práctica Profesional III", anio: 3 },
+      { id: 105, nombre: "Residencia Pedagógica", anio: 4 }
+    ];
+
+    const defaultAlumnos = [
+      { id: 1, nombre: "Alonso, Martina", dni: "44123456", cursoId: 101 },
+      { id: 2, nombre: "Gómez, Sofía", dni: "45234567", cursoId: 101 },
+      { id: 3, nombre: "Ramírez, Lucas", dni: "43345678", cursoId: 103 }
+    ];
+
+    const defaultHistorial = [];
+
+    function getStorage(key, fallback) {
+      const data = localStorage.getItem(key);
+      return data ? JSON.parse(data) : fallback;
+    }
+    function setStorage(key, data) { localStorage.setItem(key, JSON.stringify(data)); }
+
+    let profesores = getStorage("isfd_profesores", defaultProfesores);
+    let cursos = getStorage("isfd_cursos", defaultCursos);
+    let alumnos = getStorage("isfd_alumnos", defaultAlumnos);
+    let historialAsistencias = getStorage("isfd_historial", defaultHistorial);
+
+    let usuarioActual = null;
+    let cursoActualSeleccionado = null;
+
+    // LOGIN
+    function iniciarSesion() {
+      const u = document.getElementById("username").value.trim();
+      const p = document.getElementById("password").value.trim();
+      const profe = profesores.find(item => item.usuario === u && item.password === p);
+
+      if (profe) {
+        usuarioActual = profe;
+        document.getElementById("login-view").classList.remove("active");
+        document.getElementById("app-view").classList.add("active");
+        document.getElementById("header-user").innerText = profe.nombre;
+        document.getElementById("fecha-asistencia").valueAsDate = new Date();
+        cargarDashboard();
+        cargarPerfil();
+      } else {
+        document.getElementById("login-error").innerText = "Usuario o contraseña incorrectos.";
+      }
+    }
+
+    function cerrarSesion() {
+      usuarioActual = null;
+      document.getElementById("app-view").classList.remove("active");
+      document.getElementById("login-view").classList.add("active");
+      document.getElementById("username").value = "";
+      document.getElementById("password").value = "";
+      document.getElementById("login-error").innerText = "";
+    }
+
+    // NAVEGACIÓN
+    function navegar(seccionId) {
+      document.querySelectorAll(".seccion").forEach(s => s.classList.remove("active"));
+      document.getElementById(seccionId + "-section").classList.add("active");
+
+      document.querySelectorAll(".nav-item").forEach(b => b.classList.remove("active"));
+      const activeNavBtn = document.getElementById("nav-" + seccionId);
+      if (activeNavBtn) activeNavBtn.classList.add("active");
+
+      if (seccionId === 'asistencia') cargarListaCursos();
+      else if (seccionId === 'alumnos') cargarSelectCursosAlumnos();
+    }
+
+    // DASHBOARD AGRUPADO POR AÑO
+    function cargarDashboard() {
+      document.getElementById("noticias-container").innerHTML = `
+        <p style="font-size: 0.88rem; margin-bottom: 8px;">📌 <strong>Ciclo Lectivo:</strong> Bienvenida a las clases del Profesorado.</p>
+        <p style="font-size: 0.88rem;">📌 <strong>Secretaría:</strong> Entrega de planillas habilitada hasta fin de mes.</p>
+      `;
+
+      const misCursos = cursos.filter(c => usuarioActual.materias.includes(c.id));
+      const anios = [1, 2, 3, 4];
+      let htmlResumen = "";
+      const idsMis = misCursos.map(c => c.id);
+      document.getElementById("stats-container").innerHTML = [
+        [misCursos.length, "materias a cargo"],
+        [alumnos.filter(a => idsMis.includes(a.cursoId)).length, "estudiantes inscriptos"],
+        [historialAsistencias.filter(h => idsMis.includes(h.cursoId)).length, "clases registradas"]
+      ].map(([n, t]) => `<div class="stat"><div class="stat__number">${n}</div><div class="stat__label">${t}</div></div>`).join("");
+
+      anios.forEach(anio => {
+        const cursosAnio = misCursos.filter(c => (c.anio || 1) === anio);
+        if (cursosAnio.length > 0) {
+          htmlResumen += `<div class="grupo-anio-header">🎓 ${anio}.º Año</div>`;
+          cursosAnio.forEach(c => {
+            const cantAlumnos = alumnos.filter(a => a.cursoId === c.id).length;
+            const clasesTomadas = historialAsistencias.filter(h => h.cursoId === c.id).length;
+            htmlResumen += `
+              <div class="materia-row">
+                <strong>${c.nombre}</strong>
+                <div class="materia-meta">
+                  👥 ${cantAlumnos} Inscriptos | 📅 ${clasesTomadas} Clases registradas
+                </div>
+              </div>
+            `;
+          });
+        }
+      });
+
+      document.getElementById("resumen-container").innerHTML = htmlResumen || "<p style='color:var(--text-muted); font-size:0.85rem;'>No hay materias registradas.</p>";
+    }
+
+    // TOMA DE ASISTENCIA AGRUPADA POR AÑO
+    function cargarListaCursos() {
+      const container = document.getElementById("cursos-container");
+      const misCursos = cursos.filter(c => usuarioActual.materias.includes(c.id));
+      const anios = [1, 2, 3, 4];
+      let htmlCursos = "";
+
+      anios.forEach(anio => {
+        const cursosAnio = misCursos.filter(c => (c.anio || 1) === anio);
+        if (cursosAnio.length > 0) {
+          htmlCursos += `<div class="grupo-anio-header">🎓 ${anio}.º Año</div>`;
+          cursosAnio.forEach(c => {
+            htmlCursos += `
+              <button class="btn btn-outline course-btn" onclick="abrirCurso(${c.id}, '${c.nombre}', ${c.anio || 1})">
+                <span>📚 ${c.nombre}</span>
+                <span>➔</span>
+              </button>
+            `;
+          });
+        }
+      });
+
+      container.innerHTML = htmlCursos || "<p style='color:var(--text-muted); font-size:0.85rem;'>No tienes materias asignadas.</p>";
+      document.getElementById("toma-asistencia").style.display = "none";
+      container.parentElement.style.display = "block";
+    }
+
+    function abrirCurso(idCurso, nombreCurso, anioCurso) {
+      cursoActualSeleccionado = idCurso;
+      document.getElementById("lista-cursos").style.display = "none";
+      document.getElementById("toma-asistencia").style.display = "block";
+      document.getElementById("curso-titulo").innerText = nombreCurso;
+      document.getElementById("curso-anio-badge").innerText = `${anioCurso}.º Año`;
+      document.getElementById("buscar-asistencia").value = "";
+      document.getElementById("panel-historial-clases").style.display = "none";
+
+      renderizarListaAsistencia();
+    }
+
+    // OBTENER Y RENDERIZAR DESDE BACKEND PHP
+    async function renderizarListaAsistencia() {
+      const fecha = document.getElementById("fecha-asistencia").value;
+      const filtro = document.getElementById("buscar-asistencia").value.toLowerCase();
+      const container = document.getElementById("lista-alumnos-asistencia");
+
+      const alumnosCurso = alumnos.filter(a => a.cursoId === cursoActualSeleccionado && a.nombre.toLowerCase().includes(filtro));
+
+      if (alumnosCurso.length === 0) {
+        container.innerHTML = "<p style='font-size:0.85rem; color:var(--text-muted); padding: 12px 0;'>No hay alumnos para mostrar.</p>";
+        return;
+      }
+
+      // Traer la asistencia cargada vía API PHP
+      let sesionExistente = null;
+      try {
+        const res = await fetch(`../routes/api.php?action=obtener&materiaId=${cursoActualSeleccionado}&fecha=${fecha}`);
+        const resJson = await res.json();
+        if (resJson.success) sesionExistente = resJson.data;
+      } catch (err) {
+        console.error("Error al obtener asistencia desde la BD:", err);
+      }
+
+      container.innerHTML = alumnosCurso.map(a => {
+        let estado = "presente";
+        let motivo = "injustificada";
+        let obs = "";
+
+        if (sesionExistente && sesionExistente.registros) {
+          const reg = sesionExistente.registros.find(r => r.alumnoId === a.id);
+          if (reg) {
+            estado = reg.estado || "presente";
+            motivo = reg.motivo || "injustificada";
+            obs = reg.observacion || "";
+          }
+        }
+
+        const esPresente = estado === "presente";
+
+        return `
+          <div class="alumno-card" id="card-alumno-${a.id}" data-estado="${estado}">
+            <div class="alumno-info">
+              <span class="alumno-nombre">${a.nombre}</span>
+              <span class="badge badge-success">DNI ${a.dni || 'S/D'}</span>
+            </div>
+            
+            <div class="btn-toggle-container">
+              <button type="button" 
+                      id="btn-pres-${a.id}" 
+                      class="btn-estado btn-estado-presente ${esPresente ? 'active' : ''}" 
+                      onclick="setEstadoAlumno(${a.id}, 'presente')">
+                ➕ Presente
+              </button>
+              <button type="button" 
+                      id="btn-aus-${a.id}" 
+                      class="btn-estado btn-estado-ausente ${!esPresente ? 'active' : ''}" 
+                      onclick="setEstadoAlumno(${a.id}, 'ausente')">
+                ✖ Ausente
+              </button>
+            </div>
+
+            <select id="motivo-${a.id}" style="display:${!esPresente ? 'block' : 'none'}; border-color: var(--danger); margin-top: 4px;">
+              <option value="injustificada" ${motivo === 'injustificada' ? 'selected' : ''}>Ausencia Injustificada</option>
+              <option value="justificada" ${motivo === 'justificada' ? 'selected' : ''}>Ausencia Justificada</option>
+            </select>
+
+            <input type="text" id="obs-${a.id}" value="${obs}" placeholder="💬 Nota u observación rápida (opcional)..." style="font-size:0.8rem; height:34px;">
+          </div>
+        `;
+      }).join("");
+    }
+
+    function setEstadoAlumno(idAlumno, nuevoEstado) {
+      const card = document.getElementById(`card-alumno-${idAlumno}`);
+      if (!card) return;
+
+      card.dataset.estado = nuevoEstado;
+
+      const btnPres = document.getElementById(`btn-pres-${idAlumno}`);
+      const btnAus = document.getElementById(`btn-aus-${idAlumno}`);
+      const motivoSelect = document.getElementById(`motivo-${idAlumno}`);
+
+      if (nuevoEstado === 'presente') {
+        btnPres.classList.add('active');
+        btnAus.classList.remove('active');
+        motivoSelect.style.display = 'none';
+      } else {
+        btnAus.classList.add('active');
+        btnPres.classList.remove('active');
+        motivoSelect.style.display = 'block';
+      }
+    }
+
+    function cargarAsistenciaDeFecha() { renderizarListaAsistencia(); }
+    function filtrarAsistencia() { renderizarListaAsistencia(); }
+
+    function marcarTodos(estado) {
+      const alumnosCurso = alumnos.filter(a => a.cursoId === cursoActualSeleccionado);
+      alumnosCurso.forEach(a => setEstadoAlumno(a.id, estado));
+    }
+
+    function alternarHistorialClases() {
+      const panel = document.getElementById("panel-historial-clases");
+      if (panel.style.display === "none") {
+        const historialCurso = historialAsistencias.filter(h => h.cursoId === cursoActualSeleccionado);
+        const container = document.getElementById("lista-fechas-historial");
+        
+        if (historialCurso.length === 0) {
+          container.innerHTML = "<p style='font-size:0.8rem; color:var(--text-muted); margin-top:4px;'>No hay clases tomadas aún.</p>";
+        } else {
+          container.innerHTML = historialCurso.map(h => `
+            <div class="historial-item">
+              <span style="font-size:0.85rem; font-weight:600;">📅 ${h.fecha}</span>
+              <div style="display:flex; gap:6px;">
+                <button onclick="seleccionarFechaHistorial('${h.fecha}')" class="btn btn-primary btn-sm">Cargar</button>
+                <button onclick="eliminarFechaHistorial('${h.fecha}')" class="btn btn-outline btn-sm" style="color:var(--danger);">🗑️</button>
+              </div>
+            </div>
+          `).join("");
+        }
+        panel.style.display = "block";
+      } else {
+        panel.style.display = "none";
+      }
+    }
+
+    function seleccionarFechaHistorial(fecha) {
+      document.getElementById("fecha-asistencia").value = fecha;
+      document.getElementById("panel-historial-clases").style.display = "none";
+      renderizarListaAsistencia();
+    }
+
+    function eliminarFechaHistorial(fecha) {
+      if (confirm(`¿Eliminar la asistencia del día ${fecha}?`)) {
+        historialAsistencias = historialAsistencias.filter(h => !(h.cursoId === cursoActualSeleccionado && h.fecha === fecha));
+        setStorage("isfd_historial", historialAsistencias);
+        alternarHistorialClases();
+        renderizarListaAsistencia();
+        cargarDashboard();
+      }
+    }
+
+    function volverACursos() {
+      document.getElementById("toma-asistencia").style.display = "none";
+      document.getElementById("lista-cursos").style.display = "block";
+    }
+
+    // GUARDAR ASISTENCIA AL BACKEND PHP
+    async function guardarAsistencia() {
+      const fecha = document.getElementById("fecha-asistencia").value;
+      if (!fecha) { alert("Selecciona una fecha válida."); return; }
+
+      const alumnosCurso = alumnos.filter(a => a.cursoId === cursoActualSeleccionado);
+      const registrosDia = alumnosCurso.map(a => {
+        const card = document.getElementById(`card-alumno-${a.id}`);
+        const estado = card ? card.dataset.estado : 'presente';
+        const motivoSelect = document.getElementById(`motivo-${a.id}`);
+        const motivo = estado === 'ausente' && motivoSelect ? motivoSelect.value : '';
+        const obsInput = document.getElementById(`obs-${a.id}`);
+        const observacion = obsInput ? obsInput.value.trim() : '';
+        return { alumnoId: a.id, estado, motivo, observacion };
+      });
+
+      const payload = {
+        materiaId: cursoActualSeleccionado,
+        fecha: fecha,
+        registros: registrosDia
+      };
+
+      try {
+        const response = await fetch('../routes/api.php?action=guardar', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const result = await response.json();
+
+        if (result.success) {
+          alert("✅ Planilla de asistencia guardada correctamente en la BD.");
+          cargarDashboard();
+        } else {
+          alert("❌ Ocurrió un error al guardar en la BD.");
+        }
+      } catch (error) {
+        console.error("Error al persistir la asistencia:", error);
+      }
+    }
+
+    // GESTIÓN DE MATERIAS
+    function alternarFormMateria() {
+      const card = document.getElementById("form-materia-card");
+      card.style.display = card.style.display === "none" ? "block" : "none";
+    }
+
+    function guardarNuevaMateria() {
+      const nombre = document.getElementById("nueva-materia-nombre").value.trim();
+      const anio = parseInt(document.getElementById("nueva-materia-anio").value);
+
+      if (!nombre) { alert("Ingresa el nombre de la materia."); return; }
+
+      const nuevoId = cursos.length > 0 ? Math.max(...cursos.map(c => c.id)) + 1 : 101;
+      const nuevaMateria = { id: nuevoId, nombre, anio };
+      
+      cursos.push(nuevaMateria);
+      if (usuarioActual && !usuarioActual.materias.includes(nuevoId)) {
+        usuarioActual.materias.push(nuevoId);
+      }
+
+      setStorage("isfd_cursos", cursos);
+      setStorage("isfd_profesores", profesores);
+
+      document.getElementById("nueva-materia-nombre").value = "";
+      alternarFormMateria();
+      cargarSelectCursosAlumnos();
+      cargarDashboard();
+      alert(`✅ Materia '${nombre}' guardada para ${anio}.º Año.`);
+    }
+
+    // GESTIÓN DE ALUMNOS (ABM & CARGA MASIVA)
+    function cargarSelectCursosAlumnos() {
+      const select = document.getElementById("select-curso-alumnos");
+      const misCursos = cursos.filter(c => usuarioActual.materias.includes(c.id));
+      const anios = [1, 2, 3, 4];
+      let optionsHtml = "";
+
+      anios.forEach(anio => {
+        const cursosAnio = misCursos.filter(c => (c.anio || 1) === anio);
+        if (cursosAnio.length > 0) {
+          optionsHtml += `<optgroup label="🎓 ${anio}.º Año">`;
+          cursosAnio.forEach(c => {
+            optionsHtml += `<option value="${c.id}">${c.nombre}</option>`;
+          });
+          optionsHtml += `</optgroup>`;
+        }
+      });
+
+      select.innerHTML = optionsHtml;
+      renderizarGestionAlumnos();
+    }
+
+    function renderizarGestionAlumnos() {
+      const select = document.getElementById("select-curso-alumnos");
+      if(!select.value) return;
+      
+      const cursoId = parseInt(select.value);
+      const filtro = document.getElementById("buscar-alumno-abm").value.toLowerCase();
+      const container = document.getElementById("lista-gestion-alumnos");
+      
+      const alumnosCurso = alumnos.filter(a => a.cursoId === cursoId && (a.nombre.toLowerCase().includes(filtro) || a.dni.includes(filtro)));
+
+      if (alumnosCurso.length === 0) {
+        container.innerHTML = "<p style='font-size:0.85rem; color:var(--text-muted); padding: 8px 0;'>Sin alumnos registrados.</p>";
+        return;
+      }
+
+      const historialCurso = historialAsistencias.filter(h => h.cursoId === cursoId);
+      const totalClases = historialCurso.length;
+
+      container.innerHTML = alumnosCurso.map(a => {
+        let presentes = 0;
+        if (totalClases > 0) {
+          historialCurso.forEach(c => {
+            const reg = c.registros.find(r => r.alumnoId === a.id);
+            if (reg && reg.estado === 'presente') presentes++;
+          });
+        }
+        const pct = totalClases > 0 ? Math.round((presentes / totalClases) * 100) : 100;
+
+        let badgeClass = "badge-success";
+        if (pct < 65) badgeClass = "badge-danger";
+        else if (pct < 75) badgeClass = "badge-warning";
+
+        return `
+          <div class="alumno-card">
+            <div class="alumno-info">
+              <div>
+                <span class="alumno-nombre">${a.nombre}</span>
+                <div class="alumno-sub">DNI: ${a.dni || 'Sin datos'}</div>
+              </div>
+              <span class="badge ${badgeClass}">${pct}% Asist.</span>
+            </div>
+            <div style="display: flex; gap: 8px; margin-top: 6px;">
+              <button onclick="prepararEditarAlumno(${a.id})" class="btn btn-outline btn-sm" style="flex:1;">✏️ Editar</button>
+              <button onclick="eliminarAlumno(${a.id})" class="btn btn-outline btn-sm" style="flex:1; color:var(--danger);">🗑️ Eliminar</button>
+            </div>
+          </div>
+        `;
+      }).join("");
+    }
+
+    function prepararNuevoAlumno() {
+      cancelarCargaMasiva();
+      document.getElementById("form-alumno-card").style.display = "block";
+      document.getElementById("form-alumno-titulo").innerText = "Agregar Alumno Nuevo";
+      document.getElementById("alumno-edit-id").value = "";
+      document.getElementById("alumno-nombre").value = "";
+      document.getElementById("alumno-dni").value = "";
+    }
+
+    function prepararCargaMasiva() {
+      cancelarFormAlumno();
+      document.getElementById("form-carga-masiva-card").style.display = "block";
+      document.getElementById("texto-carga-masiva").value = "";
+    }
+
+    function cancelarFormAlumno() { document.getElementById("form-alumno-card").style.display = "none"; }
+    function cancelarCargaMasiva() { document.getElementById("form-carga-masiva-card").style.display = "none"; }
+
+    function guardarCargaMasiva() {
+      const texto = document.getElementById("texto-carga-masiva").value;
+      const cursoId = parseInt(document.getElementById("select-curso-alumnos").value);
+      const lineas = texto.split("\n").map(l => l.trim()).filter(l => l.length > 0);
+
+      if (lineas.length === 0) { alert("Ingresa al menos un nombre de alumno."); return; }
+
+      let creados = 0;
+      lineas.forEach(linea => {
+        const nuevoId = alumnos.length > 0 ? Math.max(...alumnos.map(a => a.id)) + 1 : 1;
+        alumnos.push({ id: nuevoId, nombre: linea, dni: "", cursoId });
+        creados++;
+      });
+
+      setStorage("isfd_alumnos", alumnos);
+      alert(`✅ Se matricularon ${creados} alumnos correctamente.`);
+      cancelarCargaMasiva();
+      renderizarGestionAlumnos();
+      cargarDashboard();
+    }
+
+    function prepararEditarAlumno(id) {
+      cancelarCargaMasiva();
+      const al = alumnos.find(a => a.id === id);
+      if (!al) return;
+      document.getElementById("form-alumno-card").style.display = "block";
+      document.getElementById("form-alumno-titulo").innerText = "Editar Alumno";
+      document.getElementById("alumno-edit-id").value = al.id;
+      document.getElementById("alumno-nombre").value = al.nombre;
+      document.getElementById("alumno-dni").value = al.dni || "";
+    }
+
+    function guardarAlumno() {
+      const idEdit = document.getElementById("alumno-edit-id").value;
+      const nombre = document.getElementById("alumno-nombre").value.trim();
+      const dni = document.getElementById("alumno-dni").value.trim();
+      const cursoId = parseInt(document.getElementById("select-curso-alumnos").value);
+
+      if (!nombre) { alert("Ingresa Apellido y Nombre."); return; }
+
+      if (idEdit) {
+        const al = alumnos.find(a => a.id === parseInt(idEdit));
+        if (al) { al.nombre = nombre; al.dni = dni; }
+      } else {
+        const nuevoId = alumnos.length > 0 ? Math.max(...alumnos.map(a => a.id)) + 1 : 1;
+        alumnos.push({ id: nuevoId, nombre, dni, cursoId });
+      }
+
+      setStorage("isfd_alumnos", alumnos);
+      cancelarFormAlumno();
+      renderizarGestionAlumnos();
+      cargarDashboard();
+    }
+
+    function eliminarAlumno(id) {
+      if (confirm("¿Eliminar a este estudiante?")) {
+        alumnos = alumnos.filter(a => a.id !== id);
+        setStorage("isfd_alumnos", alumnos);
+        renderizarGestionAlumnos();
+        cargarDashboard();
+      }
+    }
+
+    // RESPALDOS / BACKUP
+    function exportarBackup() {
+      const data = { profesores, cursos, alumnos, historialAsistencias };
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `backup_asistencia_${new Date().toISOString().slice(0,10)}.json`;
+      a.click();
+    }
+
+    function importarBackup(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          const data = JSON.parse(e.target.result);
+          if (data.profesores && data.alumnos && data.historialAsistencias) {
+            setStorage("isfd_profesores", data.profesores);
+            setStorage("isfd_cursos", data.cursos);
+            setStorage("isfd_alumnos", data.alumnos);
+            setStorage("isfd_historial", data.historialAsistencias);
+            alert("✅ Backup restaurado con éxito.");
+            location.reload();
+          } else throw new Error();
+        } catch (err) {
+          alert("❌ El archivo seleccionado no es un backup válido.");
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    function cargarPerfil() {
+      const misCursos = cursos.filter(c => usuarioActual.materias.includes(c.id)).map(c => `${c.nombre} (${c.anio || 1}.º Año)`).join(", ");
+      document.getElementById("perfil-docente-card").innerHTML = `
+        <p style="margin-bottom: 8px;"><strong>Nombre:</strong> ${usuarioActual.nombre}</p>
+        <p style="margin-bottom: 8px;"><strong>Usuario:</strong> ${usuarioActual.usuario}</p>
+        <p style="font-size: 0.88rem; color: var(--text-muted);"><strong>Materias:</strong> ${misCursos}</p>
+      `;
+    }
+
+    function reiniciarDatos() {
+      if (confirm("¿Deseas restaurar todos los datos por defecto?")) {
+        localStorage.clear();
+        location.reload();
+      }
+    }
+
+    // IMPRESIÓN / GUARDAR A PDF
+    function exportarPDF() {
+      if (!cursoActualSeleccionado) return;
+      const curso = cursos.find(c => c.id === cursoActualSeleccionado);
+      const alumnosCurso = alumnos.filter(a => a.cursoId === cursoActualSeleccionado);
+      const historialCurso = historialAsistencias.filter(h => h.cursoId === cursoActualSeleccionado);
+      const totalClases = historialCurso.length;
+
+      if (totalClases === 0) {
+        alert("Guarda al menos una planilla de asistencia antes de exportar.");
+        return;
+      }
+
+      const informeExistente = document.getElementById("contenedor-impresion");
+      if (informeExistente) informeExistente.remove();
+
+      const element = document.createElement("div");
+      element.id = "contenedor-impresion";
+      element.style.padding = "20px";
+      element.style.fontFamily = "Arial, sans-serif";
+      element.style.background = "#ffffff";
+
+      let filas = "";
+      alumnosCurso.forEach(al => {
+        let pres = 0, ausJ = 0, ausI = 0;
+        historialCurso.forEach(c => {
+          const r = c.registros.find(reg => reg.alumnoId === al.id);
+          if (r) {
+            if (r.estado === 'presente') pres++;
+            else if (r.motivo === 'justificada') ausJ++;
+            else ausI++;
+          }
+        });
+        const pct = ((pres / totalClases) * 100).toFixed(1);
+
+        filas += `
+          <tr style="border-bottom: 1px solid #ddd;">
+            <td style="padding: 8px;">${al.nombre} (${al.dni || 'S/D'})</td>
+            <td style="padding: 8px; text-align: center;">${pres}</td>
+            <td style="padding: 8px; text-align: center;">${ausJ}</td>
+            <td style="padding: 8px; text-align: center;">${ausI}</td>
+            <td style="padding: 8px; text-align: center; font-weight: bold; color: ${pct >= 75 ? '#10B981' : '#EF4444'};">${pct}%</td>
+          </tr>
+        `;
+      });
+
+      element.innerHTML = `
+        <div style="text-align: center; margin-bottom: 20px;">
+          <h2 style="color: #078a78; margin-bottom: 5px;">Informe de Asistencia</h2>
+          <p><strong>Materia:</strong> ${curso.nombre} (${curso.anio || 1}.º Año) | <strong>Docente:</strong> ${usuarioActual.nombre}</p>
+          <p style="font-size: 0.85em; color: #666;">Total de clases registradas: ${totalClases}</p>
+        </div>
+        <table style="width: 100%; border-collapse: collapse; font-size: 0.85em;">
+          <thead>
+            <tr style="background: #078a78; color: white;">
+              <th style="padding: 8px; text-align: left;">Alumno</th>
+              <th style="padding: 8px;">Presentes</th>
+              <th style="padding: 8px;">Aus. Just.</th>
+              <th style="padding: 8px;">Aus. Injust.</th>
+              <th style="padding: 8px;">% Asistencia</th>
+            </tr>
+          </thead>
+          <tbody>${filas}</tbody>
+        </table>
+      `;
+
+      document.body.appendChild(element);
+
+      window.print();
+
+      setTimeout(() => {
+        if (element.parentNode) element.remove();
+      }, 1000);
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Formulario de logeo</title>
+    <link rel="stylesheet" href="../../Control_de_Asistencia_2026/Public/Css/style(2).css">
+     <Script src="../../Control_de_Asistencia_2026/Public/Js/auth.js"></Script>
+</head>
+<body>
+
+    <header class="header"> 
+        <div class="logo">
+            <img src="../../Control_de_Asistencia_2026/Public/imagen/Logo-ISFD-Banderin-tricolor-01-500x500.png" alt="logo" class="logoisfdm-img">
+            <h1 class="title">Instituto Superior de Formación Docente Mercedes</h1>
+        </div>
+
+        <nav class="nav"> 
+            <ul class="Menu">
+                <li><a href="https://ifdmercedes-crr.infd.edu.ar/sitio/">WEB</a></li>
+                <li><a href="https://www.argentina.gob.ar/">Argentina</a></li>
+                <li><a href="https://mapa.infd.edu.ar/">MAPA</a></li>
+                <li><a href="https://red.infd.edu.ar/biblioteca-nuestra-escuela/">BIBLIOTECA</a></li>
+                <li><a href="#">Mi Perfil</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <div class="wrapper"> 
+
+        <div class="content">
+
+            <div class="imagen">
+                <img src="../../Control_de_Asistencia_2026/Public/imagen/40aniversarioblanco.png" alt="logo">
+                <label for="ISFD">ISFD Mercedes</label>
+            </div>
+        <form action=" " method="POST">
+
+            <div class="Formulario">
+                <form action="../Views/asistencia.html" method="post" onsubmit="control()">
+
+                    <label for="Email">Email</label>
+                    <input type="email"
+                           name="usuario"
+                           id="Email"
+                           placeholder="Ingrese su correo Email"
+                           required />
+
+                    <label for="password">Contraseña</label>
+                    <input type="password"
+                           name="password"
+                           id="password"
+                           placeholder="Ingrese su contraseña"
+                           required />
+
+                    <input type="submit" class="btn"  value="Enviar" />
+                    <div class="separador">
+                        <span></span> 
+                             <p>o</p>
+                            <span></span>
+                        </div>
+
+                </form>
+            </div>
+
+        </div>
+        <div class="content2">
+            <div class="lado-imagen">
+                <img src="../../Control_de_Asistencia_2026/Public/imagen/Nuestroinstituto.png" alt="logoderecha" class="imgderecha">
+            </div>
+        </div>
+
+    </div>
+
+
+    <footer class="footer">
+
+    <div class="footer__grid">
+
+        <div class="footer__col">
+            <div class="footer__brand-logo-area">
+                <img src="../../Control_de_Asistencia_2026/Public/imagen/isfdblancoy40ani.png" alt="Logo ISFD" class="footer__brand-img">
+                <div>
+                <p class="footer__brand-name">Instituto Superior de Formación Docente</p>
+                <p class="footer__brand-sub">Mercedes · Corrientes</p>
+                </div>
+            </div>
+            <p class="footer__descr">1986-2026</p>
+            <div class="footer__socials">
+                <a href="https://instagram.com/isfd_mercedes" target="_blank">Instegram: @isfd_mercedes</a>
+                <a href="https://facebook.com/ISFDMercedesCorrientes" target="_blank">Facebook: ISFDMercedesCorrientes</a>
+                <a href="mailto:ifdmercedes@hotmail.com">Correo: ifdmercedes@hotmail.com</a>
+            </div>
+        </div>
+
+        <div class="footer__col">
+        <h4>Institución</h4>
+            <ul>
+                <li><a href="#">Nuestra historia</a></li>
+                <li><a href="#">Autoridades</a></li>
+                <li><a href="#">Misión y visión</a></li>
+                <li><a href="#">Cuerpo docente</a></li>
+                <li><a href="#">Infraestructura</a></li>
+            </ul>
+        </div>
+
+        <div class="footer__col">
+        <h4>Servicios</h4>
+            <ul>
+                <li><a href="#">Carreras y planes de estudio</a></li>
+                <li><a href="#">Inscripciones</a></li>
+                <li><a href="#">Biblioteca</a></li>
+                <li><a href="#">Aula virtual</a></li>
+                <li><a href="#">Soporte técnico</a></li>
+            </ul>
+        </div>
+
+        <div class="footer__col">
+        <h4>Contacto</h4>
+
+        <div class="footer__contact-item">
+            <span class="footer__contact-label">Dirección</span>
+            <span class="footer__contact-value">José María Gómez y Yatay, Mercedes, Corrientes</span>
+        </div>
+
+        <div class="footer__contact-item">
+            <span class="footer__contact-label">Horario de atención</span>
+            <span class="footer__contact-value">Lun a Vie: 7:30 a 23:00 hs.</span>
+        </div>
+
+        <div class="footer__contact-item">
+            <span class="footer__contact-label">Correo institucional</span>
+            <span class="footer__contact-value">
+            <a href="#">ifdmercedes@hotmail.com</a>
+            </span>
+        </div>
+
+        <div class="footer__contact-item">
+            <span class="footer__contact-label">Soporte</span>
+            <span class="footer__contact-value">
+            <a href="mailto:soporte@isfdmercedes.edu.ar">soporte@isfdmercedes.edu.ar</a>
+            </span>
+        </div>
+    </div>
+
+    </div>
+
+    <div class="footer_bottom">
+        <span>© 2026 ISFD Mercedes · Todos los derechos reservados</span>
+        <nav>
+        <a href="#">Términos de uso</a>
+        <a href="#">Política de privacidad</a>
+        <a href="#">Accesibilidad</a>
+        <a href="#">Mapa del sitio</a>
+        </nav>
+    </div>
+
+    </footer>
+    
+   
+</body>
+</html>

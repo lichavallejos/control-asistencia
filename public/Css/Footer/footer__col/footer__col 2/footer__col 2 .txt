@@ -1,0 +1,10 @@
+<div class="footer__col">	
+	<h4>Institución</h4>
+            <ul>
+                <li><a href="#">Nuestra historia</a></li>
+                <li><a href="#">Autoridades</a></li>
+                <li><a href="#">Misión y visión</a></li>
+                <li><a href="#">Cuerpo docente</a></li>
+                <li><a href="#">Infraestructura</a></li>
+            </ul>
+</div>
