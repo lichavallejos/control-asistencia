@@ -24,7 +24,8 @@ export default function LoginPage() {
       } else {
         setError(resultado.error);
       }
-    } catch {
+      } catch (e) {
+      console.error("Error al iniciar sesión:", e);
       setError("No se pudo conectar. Revisá tu conexión e intentá de nuevo.");
     } finally {
       setEnviando(false);
