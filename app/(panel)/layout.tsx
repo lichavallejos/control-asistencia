@@ -11,7 +11,7 @@ const items = [
   { ruta: "/usuario", id: "usuario", icono: "👤", texto: "Perfil" },
 ];
 
-export const instant = false;
+
 
 export default function PanelLayout({
   children,

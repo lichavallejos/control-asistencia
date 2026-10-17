@@ -5,9 +5,9 @@ import { obtenerUsuario } from "@/lib/sesion";
 import { alumnos, cursos, type Profesor } from "@/lib/datos-demo";
 import { obtenerPlanillas, type Planilla } from "@/lib/asistencias-demo";
 
-const ANIOS = [1, 2, 3, 4];
-
 export const instant = false;
+
+const ANIOS = [1, 2, 3, 4];
 
 export default function DashboardPage() {
   const [usuario, setUsuario] = useState<Profesor | null>(null);

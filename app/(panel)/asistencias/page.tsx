@@ -11,6 +11,8 @@ import {
   type RegistroAlumno,
 } from "@/lib/asistencias-demo";
 
+export const instant = false;
+
 const ANIOS = [1, 2, 3, 4];
 
 type Registros = Record<number, RegistroAlumno>;
