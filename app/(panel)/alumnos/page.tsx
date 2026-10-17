@@ -434,14 +434,14 @@ export default function AlumnosPage() {
                       className="btn btn-outline btn-sm"
                       style={{ flex: 1 }}
                     >
-                      ✏️ Editar
+                      Editar
                     </button>
                     <button
                       onClick={() => quitarAlumno(a)}
                       className="btn btn-outline btn-sm"
                       style={{ flex: 1, color: "var(--danger)" }}
                     >
-                      🗑️ Quitar
+                      Quitar
                     </button>
                   </div>
                 </div>

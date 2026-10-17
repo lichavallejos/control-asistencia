@@ -5,10 +5,10 @@ import { useRouter, usePathname } from "next/navigation";
 import { restaurarUsuario } from "@/lib/sesion";
 
 const items = [
-  { ruta: "/dashboard", id: "dashboard", icono: "🏠", texto: "Inicio" },
-  { ruta: "/asistencias", id: "asistencia", icono: "📋", texto: "Asistencia" },
-  { ruta: "/alumnos", id: "alumnos", icono: "👥", texto: "Alumnos" },
-  { ruta: "/usuario", id: "usuario", icono: "👤", texto: "Perfil" },
+  { ruta: "/dashboard", id: "dashboard", icono: " ", texto: "Inicio" },
+  { ruta: "/asistencias", id: "asistencia", icono: " ", texto: "Asistencia" },
+  { ruta: "/alumnos", id: "alumnos", icono: " ", texto: "Alumnos" },
+  { ruta: "/usuario", id: "usuario", icono: " ", texto: "Perfil" },
 ];
 
 export default function PanelLayout({

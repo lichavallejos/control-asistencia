@@ -92,12 +92,12 @@ export default function DashboardPage() {
             if (delAnio.length === 0) return null;
             return (
               <div key={anio}>
-                <div className="grupo-anio-header">🎓 {anio}.º Año</div>
+                <div className="grupo-anio-header"> {anio}.º Año</div>
                 {delAnio.map((m) => (
                   <div className="materia-row" key={m.id}>
                     <strong>{m.nombre}</strong>
                     <div className="materia-meta">
-                      👥 {conteo[m.id] ?? 0} Inscriptos | 📅 {clases[m.id] ?? 0}{" "}
+                      👥 {conteo[m.id] ?? 0} Inscriptos | {clases[m.id] ?? 0}{" "}
                       Clases registradas
                     </div>
                   </div>

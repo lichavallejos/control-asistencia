@@ -156,7 +156,7 @@ export default function AsistenciasPage() {
     try {
       await guardarAsistencia(materia.id, fecha, Object.values(registros));
       setClases(await obtenerClases(materia.id));
-      alert("✅ Planilla de asistencia guardada correctamente.");
+      alert("Planilla de asistencia guardada correctamente.");
     } catch (e) {
       alert((e as Error).message);
     } finally {
@@ -222,7 +222,7 @@ export default function AsistenciasPage() {
               if (delAnio.length === 0) return null;
               return (
                 <div key={anio}>
-                  <div className="grupo-anio-header">🎓 {anio}.º Año</div>
+                  <div className="grupo-anio-header"> {anio}.º Año</div>
                   {delAnio.map((m) => (
                     <button
                       key={m.id}
@@ -230,7 +230,7 @@ export default function AsistenciasPage() {
                       onClick={() => abrirMateria(m)}
                       disabled={ocupado}
                     >
-                      <span>📚 {m.nombre}</span>
+                      <span> {m.nombre}</span>
                       <span>➔</span>
                     </button>
                   ))}
@@ -300,7 +300,7 @@ export default function AsistenciasPage() {
                         className="btn btn-outline btn-sm"
                         style={{ color: "var(--danger)" }}
                       >
-                        🗑️
+                        
                       </button>
                     </div>
                   </div>
