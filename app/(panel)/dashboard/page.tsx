@@ -2,20 +2,18 @@
 
 import { useEffect, useState } from "react";
 import { obtenerUsuario } from "@/lib/sesion";
-import {
-  alumnos,
-  cursos,
-  historialAsistencias,
-  type Profesor,
-} from "@/lib/datos-demo";
+import { alumnos, cursos, type Profesor } from "@/lib/datos-demo";
+import { obtenerPlanillas, type Planilla } from "@/lib/asistencias-demo";
 
 const ANIOS = [1, 2, 3, 4];
 
 export default function DashboardPage() {
   const [usuario, setUsuario] = useState<Profesor | null>(null);
+  const [planillas, setPlanillas] = useState<Planilla[]>([]);
 
   useEffect(() => {
     setUsuario(obtenerUsuario());
+    setPlanillas(obtenerPlanillas());
   }, []);
 
   if (!usuario) return null;
@@ -30,7 +28,7 @@ export default function DashboardPage() {
       "estudiantes inscriptos",
     ],
     [
-      historialAsistencias.filter((h) => idsMis.includes(h.cursoId)).length,
+      planillas.filter((h) => idsMis.includes(h.cursoId)).length,
       "clases registradas",
     ],
   ] as const;
@@ -69,7 +67,7 @@ export default function DashboardPage() {
                   const cantAlumnos = alumnos.filter(
                     (a) => a.cursoId === c.id
                   ).length;
-                  const clases = historialAsistencias.filter(
+                  const clases = planillas.filter(
                     (h) => h.cursoId === c.id
                   ).length;
                   return (
