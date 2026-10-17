@@ -7,12 +7,13 @@ import {
   editarAlumno,
   matricularLista,
   obtenerAlumnosDeMateria,
+  obtenerEstadisticasMateria,
   obtenerMisMaterias,
   quitarAlumnoDeMateria,
   type AlumnoDeMateria,
+  type EstadisticasMateria,
   type Materia,
 } from "@/lib/datos";
-import { obtenerPlanillas } from "@/lib/asistencias-demo";
 
 const ANIOS = [1, 2, 3, 4];
 
@@ -36,8 +37,11 @@ export default function AlumnosPage() {
   const [textoMasivo, setTextoMasivo] = useState("");
   const [guardando, setGuardando] = useState(false);
 
-  // Planillas guardadas en el navegador (hasta el paso 16b) para calcular el %
-  const [planillas] = useState(() => obtenerPlanillas());
+  // Para calcular el % de asistencia de cada alumno
+  const [stats, setStats] = useState<EstadisticasMateria>({
+    totalClases: 0,
+    presentesPorInscripcion: {},
+  });
 
   // Cargar materias
   useEffect(() => {
@@ -63,9 +67,14 @@ export default function AlumnosPage() {
   useEffect(() => {
     if (!materiaId) return;
     let activo = true;
-    obtenerAlumnosDeMateria(materiaId)
-      .then((lista) => {
-        if (activo) setAlumnos(lista);
+    Promise.all([
+      obtenerAlumnosDeMateria(materiaId),
+      obtenerEstadisticasMateria(materiaId),
+    ])
+      .then(([lista, estadisticas]) => {
+        if (!activo) return;
+        setAlumnos(lista);
+        setStats(estadisticas);
       })
       .catch((e: Error) => {
         if (activo) setError(e.message);
@@ -170,7 +179,6 @@ export default function AlumnosPage() {
     (a) =>
       a.nombre.toLowerCase().includes(textoFiltro) || a.dni.includes(textoFiltro)
   );
-  const historialMateria = planillas.filter((p) => p.materiaId === materiaId);
 
   return (
     <section className="seccion active">
@@ -398,12 +406,8 @@ export default function AlumnosPage() {
               </p>
             )}
             {alumnosFiltrados.map((a) => {
-              const totalClases = historialMateria.length;
-              const presentes = historialMateria.filter((c) =>
-                c.registros.some(
-                  (r) => r.alumnoId === a.personaId && r.estado === "presente"
-                )
-              ).length;
+              const totalClases = stats.totalClases;
+              const presentes = stats.presentesPorInscripcion[a.inscripcionId] ?? 0;
               const pct =
                 totalClases > 0
                   ? Math.round((presentes / totalClases) * 100)

@@ -36,6 +36,26 @@ function aError(error: ErrorSupabase, porDefecto: string): Error {
   return new Error(porDefecto);
 }
 
+// Supabase devuelve como máximo 1000 filas por consulta: esto las pide por tandas.
+const TAMANO_PAGINA = 1000;
+
+async function leerTodo<T>(
+  pedir: (
+    desde: number,
+    hasta: number
+  ) => PromiseLike<{ data: T[] | null; error: ErrorSupabase | null }>,
+  mensaje: string
+): Promise<T[]> {
+  const todo: T[] = [];
+  for (let desde = 0; ; desde += TAMANO_PAGINA) {
+    const { data, error } = await pedir(desde, desde + TAMANO_PAGINA - 1);
+    if (error) throw aError(error, mensaje);
+    todo.push(...(data ?? []));
+    if (!data || data.length < TAMANO_PAGINA) break;
+  }
+  return todo;
+}
+
 // ---------- Materias ----------
 
 export async function obtenerMisMaterias(): Promise<Materia[]> {
@@ -81,13 +101,19 @@ export async function obtenerAlumnosDeMateria(
 
 // Cantidad de alumnos por materia (para el panel de inicio)
 export async function contarAlumnosPorMateria(): Promise<Record<string, number>> {
-  const { data, error } = await crearClienteNavegador()
-    .from("inscripciones")
-    .select("materia_id");
-  if (error) throw aError(error, "No se pudo contar los alumnos.");
+  const supabase = crearClienteNavegador();
+  const filas = await leerTodo<{ materia_id: string }>(
+    (desde, hasta) =>
+      supabase
+        .from("inscripciones")
+        .select("materia_id")
+        .order("id")
+        .range(desde, hasta),
+    "No se pudo contar los alumnos."
+  );
 
   const conteo: Record<string, number> = {};
-  (data as { materia_id: string }[]).forEach((f) => {
+  filas.forEach((f) => {
     conteo[f.materia_id] = (conteo[f.materia_id] ?? 0) + 1;
   });
   return conteo;
@@ -199,4 +225,168 @@ export async function matricularLista(
   if (errorInsc) throw aError(errorInsc, "No se pudo inscribir la lista.");
 
   return (personas as { id: string }[]).length;
+}
+
+// ---------- Clases y asistencias ----------
+
+export type EstadoAsistencia = "presente" | "ausente";
+
+// Un registro de asistencia, ligado a la inscripción del alumno en la materia
+export type RegistroAsistencia = {
+  inscripcionId: string;
+  estado: EstadoAsistencia;
+  motivo: string; // "justificada" | "injustificada" (solo si está ausente)
+  observacion: string;
+};
+
+export type ClaseGuardada = { id: string; fecha: string };
+
+// Fechas en las que ya se tomó asistencia en la materia (la más reciente primero)
+export async function obtenerClases(materiaId: string): Promise<ClaseGuardada[]> {
+  const { data, error } = await crearClienteNavegador()
+    .from("clases")
+    .select("id, fecha")
+    .eq("materia_id", materiaId)
+    .order("fecha", { ascending: false });
+  if (error) throw aError(error, "No se pudo cargar el historial.");
+  return data as ClaseGuardada[];
+}
+
+// Asistencia ya guardada para una fecha (lista vacía si todavía no se tomó)
+export async function obtenerAsistenciaDeClase(
+  materiaId: string,
+  fecha: string
+): Promise<RegistroAsistencia[]> {
+  const supabase = crearClienteNavegador();
+
+  const { data: clase, error } = await supabase
+    .from("clases")
+    .select("id")
+    .eq("materia_id", materiaId)
+    .eq("fecha", fecha)
+    .maybeSingle();
+  if (error) throw aError(error, "No se pudo cargar la clase.");
+  if (!clase) return [];
+
+  const filas = await leerTodo<{
+    inscripcion_id: string;
+    estado: EstadoAsistencia;
+    motivo: string | null;
+    observacion: string | null;
+  }>(
+    (desde, hasta) =>
+      supabase
+        .from("asistencias")
+        .select("inscripcion_id, estado, motivo, observacion")
+        .eq("clase_id", clase.id)
+        .order("id")
+        .range(desde, hasta),
+    "No se pudo cargar la asistencia."
+  );
+
+  return filas.map((f) => ({
+    inscripcionId: f.inscripcion_id,
+    estado: f.estado,
+    motivo: f.motivo ?? "",
+    observacion: f.observacion ?? "",
+  }));
+}
+
+// Guarda la planilla del día: crea la clase si no existe y registra cada alumno.
+// Si ya había una planilla para esa fecha, la reemplaza.
+export async function guardarAsistencia(
+  materiaId: string,
+  fecha: string,
+  registros: RegistroAsistencia[]
+): Promise<void> {
+  const supabase = crearClienteNavegador();
+
+  const { data: clase, error } = await supabase
+    .from("clases")
+    .upsert({ materia_id: materiaId, fecha }, { onConflict: "materia_id,fecha" })
+    .select("id")
+    .single();
+  if (error) throw aError(error, "No se pudo guardar la clase.");
+  if (registros.length === 0) return;
+
+  const filas = registros.map((r) => ({
+    clase_id: clase.id,
+    inscripcion_id: r.inscripcionId,
+    materia_id: materiaId,
+    estado: r.estado,
+    motivo: r.estado === "ausente" ? r.motivo || "injustificada" : null,
+    observacion: r.observacion.trim() || null,
+  }));
+
+  const { error: errorAsist } = await supabase
+    .from("asistencias")
+    .upsert(filas, { onConflict: "clase_id,inscripcion_id" });
+  if (errorAsist) throw aError(errorAsist, "No se pudo guardar la asistencia.");
+}
+
+// Borra la clase y, con ella, toda su asistencia
+export async function eliminarClase(claseId: string): Promise<void> {
+  const { error } = await crearClienteNavegador()
+    .from("clases")
+    .delete()
+    .eq("id", claseId);
+  if (error) throw aError(error, "No se pudo eliminar la clase.");
+}
+
+// Cantidad de clases registradas por materia (para el panel de inicio)
+export async function contarClasesPorMateria(): Promise<Record<string, number>> {
+  const supabase = crearClienteNavegador();
+  const filas = await leerTodo<{ materia_id: string }>(
+    (desde, hasta) =>
+      supabase
+        .from("clases")
+        .select("materia_id")
+        .order("id")
+        .range(desde, hasta),
+    "No se pudo contar las clases."
+  );
+
+  const conteo: Record<string, number> = {};
+  filas.forEach((f) => {
+    conteo[f.materia_id] = (conteo[f.materia_id] ?? 0) + 1;
+  });
+  return conteo;
+}
+
+export type EstadisticasMateria = {
+  totalClases: number;
+  presentesPorInscripcion: Record<string, number>;
+};
+
+// Para calcular el % de asistencia de cada alumno de una materia
+export async function obtenerEstadisticasMateria(
+  materiaId: string
+): Promise<EstadisticasMateria> {
+  const supabase = crearClienteNavegador();
+
+  const { count, error } = await supabase
+    .from("clases")
+    .select("id", { count: "exact", head: true })
+    .eq("materia_id", materiaId);
+  if (error) throw aError(error, "No se pudieron calcular las estadísticas.");
+
+  const filas = await leerTodo<{ inscripcion_id: string }>(
+    (desde, hasta) =>
+      supabase
+        .from("asistencias")
+        .select("inscripcion_id")
+        .eq("materia_id", materiaId)
+        .eq("estado", "presente")
+        .order("id")
+        .range(desde, hasta),
+    "No se pudieron calcular las estadísticas."
+  );
+
+  const presentesPorInscripcion: Record<string, number> = {};
+  filas.forEach((f) => {
+    presentesPorInscripcion[f.inscripcion_id] =
+      (presentesPorInscripcion[f.inscripcion_id] ?? 0) + 1;
+  });
+
+  return { totalClases: count ?? 0, presentesPorInscripcion };
 }

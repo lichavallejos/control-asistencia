@@ -1,23 +1,24 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
+  eliminarClase,
+  guardarAsistencia,
   obtenerAlumnosDeMateria,
+  obtenerAsistenciaDeClase,
+  obtenerClases,
   obtenerMisMaterias,
   type AlumnoDeMateria,
+  type ClaseGuardada,
+  type EstadoAsistencia,
   type Materia,
+  type RegistroAsistencia,
 } from "@/lib/datos";
-import {
-  eliminarPlanilla,
-  guardarPlanilla,
-  obtenerPlanilla,
-  obtenerPlanillas,
-  type RegistroAlumno,
-} from "@/lib/asistencias-demo";
 
 const ANIOS = [1, 2, 3, 4];
 
-type Registros = Record<string, RegistroAlumno>;
+// Los registros se indexan por inscripción (alumno + materia)
+type Registros = Record<string, RegistroAsistencia>;
 
 function hoy() {
   const d = new Date();
@@ -26,21 +27,20 @@ function hoy() {
   return `${d.getFullYear()}-${mes}-${dia}`;
 }
 
-// Usa la planilla guardada si existe; si no, todos presentes (como en el HTML original)
+// Usa lo ya guardado para esa fecha; los alumnos sin registro quedan presentes
+// (igual que en el HTML original).
 function armarRegistros(
-  materiaId: string,
-  fecha: string,
-  alumnos: AlumnoDeMateria[]
+  alumnos: AlumnoDeMateria[],
+  guardados: RegistroAsistencia[]
 ): Registros {
-  const planilla = obtenerPlanilla(materiaId, fecha);
   const resultado: Registros = {};
   alumnos.forEach((a) => {
-    const guardado = planilla?.registros.find((r) => r.alumnoId === a.personaId);
-    resultado[a.personaId] = {
-      alumnoId: a.personaId,
-      estado: guardado?.estado ?? "presente",
-      motivo: guardado?.motivo || "injustificada",
-      observacion: guardado?.observacion ?? "",
+    const g = guardados.find((r) => r.inscripcionId === a.inscripcionId);
+    resultado[a.inscripcionId] = {
+      inscripcionId: a.inscripcionId,
+      estado: g?.estado ?? "presente",
+      motivo: g?.motivo || "injustificada",
+      observacion: g?.observacion ?? "",
     };
   });
   return resultado;
@@ -53,11 +53,15 @@ export default function AsistenciasPage() {
 
   const [materia, setMateria] = useState<Materia | null>(null);
   const [alumnos, setAlumnos] = useState<AlumnoDeMateria[]>([]);
+  const [clases, setClases] = useState<ClaseGuardada[]>([]);
   const [fecha, setFecha] = useState("");
   const [filtro, setFiltro] = useState("");
   const [registros, setRegistros] = useState<Registros>({});
   const [historialAbierto, setHistorialAbierto] = useState(false);
-  const [planillas, setPlanillas] = useState(() => obtenerPlanillas());
+  const [ocupado, setOcupado] = useState(false);
+
+  // Evita que una respuesta lenta pise a una más nueva al cambiar de fecha rápido
+  const ultimaSolicitud = useRef(0);
 
   useEffect(() => {
     let activo = true;
@@ -77,27 +81,50 @@ export default function AsistenciasPage() {
     };
   }, []);
 
+  async function cargarFecha(
+    m: Materia,
+    lista: AlumnoDeMateria[],
+    f: string
+  ) {
+    const numero = ++ultimaSolicitud.current;
+    const guardados = await obtenerAsistenciaDeClase(m.id, f);
+    if (numero !== ultimaSolicitud.current) return;
+    setRegistros(armarRegistros(lista, guardados));
+  }
+
   async function abrirMateria(m: Materia) {
+    setOcupado(true);
     try {
-      const lista = await obtenerAlumnosDeMateria(m.id);
+      const [lista, historial] = await Promise.all([
+        obtenerAlumnosDeMateria(m.id),
+        obtenerClases(m.id),
+      ]);
       const f = hoy();
+      await cargarFecha(m, lista, f);
       setAlumnos(lista);
+      setClases(historial);
       setMateria(m);
       setFecha(f);
       setFiltro("");
       setHistorialAbierto(false);
-      setRegistros(armarRegistros(m.id, f, lista));
+    } catch (e) {
+      alert((e as Error).message);
+    } finally {
+      setOcupado(false);
+    }
+  }
+
+  async function cambiarFecha(f: string) {
+    setFecha(f);
+    if (!materia || !f) return;
+    try {
+      await cargarFecha(materia, alumnos, f);
     } catch (e) {
       alert((e as Error).message);
     }
   }
 
-  function cambiarFecha(f: string) {
-    setFecha(f);
-    if (materia && f) setRegistros(armarRegistros(materia.id, f, alumnos));
-  }
-
-  function setEstado(id: string, estado: "presente" | "ausente") {
+  function setEstado(id: string, estado: EstadoAsistencia) {
     setRegistros((prev) => ({ ...prev, [id]: { ...prev[id], estado } }));
   }
 
@@ -109,45 +136,51 @@ export default function AsistenciasPage() {
     setRegistros((prev) => ({ ...prev, [id]: { ...prev[id], observacion } }));
   }
 
-  function marcarTodos(estado: "presente" | "ausente") {
+  function marcarTodos(estado: EstadoAsistencia) {
     setRegistros((prev) => {
       const nuevo: Registros = {};
       Object.values(prev).forEach((r) => {
-        nuevo[r.alumnoId] = { ...r, estado };
+        nuevo[r.inscripcionId] = { ...r, estado };
       });
       return nuevo;
     });
   }
 
-  function guardar() {
+  async function guardar() {
     if (!materia) return;
     if (!fecha) {
       alert("Selecciona una fecha válida.");
       return;
     }
-    guardarPlanilla({
-      materiaId: materia.id,
-      fecha,
-      registros: Object.values(registros).map((r) => ({
-        ...r,
-        motivo: r.estado === "ausente" ? r.motivo : "",
-      })),
-    });
-    setPlanillas(obtenerPlanillas());
-    alert("✅ Planilla de asistencia guardada correctamente.");
-  }
-
-  function eliminarFecha(f: string) {
-    if (!materia) return;
-    if (confirm(`¿Eliminar la asistencia del día ${f}?`)) {
-      eliminarPlanilla(materia.id, f);
-      setPlanillas(obtenerPlanillas());
-      if (f === fecha) setRegistros(armarRegistros(materia.id, fecha, alumnos));
+    setOcupado(true);
+    try {
+      await guardarAsistencia(materia.id, fecha, Object.values(registros));
+      setClases(await obtenerClases(materia.id));
+      alert("✅ Planilla de asistencia guardada correctamente.");
+    } catch (e) {
+      alert((e as Error).message);
+    } finally {
+      setOcupado(false);
     }
   }
 
-  function cargarFecha(f: string) {
-    cambiarFecha(f);
+  async function eliminarFecha(clase: ClaseGuardada) {
+    if (!materia) return;
+    if (!confirm(`¿Eliminar la asistencia del día ${clase.fecha}?`)) return;
+    setOcupado(true);
+    try {
+      await eliminarClase(clase.id);
+      setClases(await obtenerClases(materia.id));
+      if (clase.fecha === fecha) await cargarFecha(materia, alumnos, fecha);
+    } catch (e) {
+      alert((e as Error).message);
+    } finally {
+      setOcupado(false);
+    }
+  }
+
+  async function cargarDesdeHistorial(f: string) {
+    await cambiarFecha(f);
     setHistorialAbierto(false);
   }
 
@@ -155,12 +188,6 @@ export default function AsistenciasPage() {
   const alumnosFiltrados = alumnos.filter((a) =>
     a.nombre.toLowerCase().includes(textoFiltro)
   );
-
-  const historialMateria = materia
-    ? planillas
-        .filter((p) => p.materiaId === materia.id)
-        .sort((a, b) => b.fecha.localeCompare(a.fecha))
-    : [];
 
   return (
     <section className="seccion active">
@@ -201,6 +228,7 @@ export default function AsistenciasPage() {
                       key={m.id}
                       className="btn btn-outline course-btn"
                       onClick={() => abrirMateria(m)}
+                      disabled={ocupado}
                     >
                       <span>📚 {m.nombre}</span>
                       <span>➔</span>
@@ -243,7 +271,7 @@ export default function AsistenciasPage() {
                 Clases Registradas Anteriores:
               </strong>
               <div>
-                {historialMateria.length === 0 && (
+                {clases.length === 0 && (
                   <p
                     style={{
                       fontSize: "0.8rem",
@@ -254,20 +282,21 @@ export default function AsistenciasPage() {
                     No hay clases tomadas aún.
                   </p>
                 )}
-                {historialMateria.map((h) => (
-                  <div className="historial-item" key={h.fecha}>
+                {clases.map((c) => (
+                  <div className="historial-item" key={c.id}>
                     <span style={{ fontSize: "0.85rem", fontWeight: 600 }}>
-                      📅 {h.fecha}
+                      📅 {c.fecha}
                     </span>
                     <div style={{ display: "flex", gap: "6px" }}>
                       <button
-                        onClick={() => cargarFecha(h.fecha)}
+                        onClick={() => cargarDesdeHistorial(c.fecha)}
                         className="btn btn-primary btn-sm"
                       >
                         Cargar
                       </button>
                       <button
-                        onClick={() => eliminarFecha(h.fecha)}
+                        onClick={() => eliminarFecha(c)}
+                        disabled={ocupado}
                         className="btn btn-outline btn-sm"
                         style={{ color: "var(--danger)" }}
                       >
@@ -333,13 +362,13 @@ export default function AsistenciasPage() {
               </p>
             )}
             {alumnosFiltrados.map((a) => {
-              const reg = registros[a.personaId];
+              const reg = registros[a.inscripcionId];
               if (!reg) return null;
               const esPresente = reg.estado === "presente";
               return (
                 <div
                   className="alumno-card"
-                  key={a.personaId}
+                  key={a.inscripcionId}
                   data-estado={reg.estado}
                 >
                   <div className="alumno-info">
@@ -353,14 +382,14 @@ export default function AsistenciasPage() {
                     <button
                       type="button"
                       className={`btn-estado btn-estado-presente ${esPresente ? "active" : ""}`}
-                      onClick={() => setEstado(a.personaId, "presente")}
+                      onClick={() => setEstado(a.inscripcionId, "presente")}
                     >
                       ➕ Presente
                     </button>
                     <button
                       type="button"
                       className={`btn-estado btn-estado-ausente ${!esPresente ? "active" : ""}`}
-                      onClick={() => setEstado(a.personaId, "ausente")}
+                      onClick={() => setEstado(a.inscripcionId, "ausente")}
                     >
                       ✖ Ausente
                     </button>
@@ -369,7 +398,7 @@ export default function AsistenciasPage() {
                   {!esPresente && (
                     <select
                       value={reg.motivo}
-                      onChange={(e) => setMotivo(a.personaId, e.target.value)}
+                      onChange={(e) => setMotivo(a.inscripcionId, e.target.value)}
                       style={{ borderColor: "var(--danger)", marginTop: "4px" }}
                     >
                       <option value="injustificada">Ausencia Injustificada</option>
@@ -380,7 +409,9 @@ export default function AsistenciasPage() {
                   <input
                     type="text"
                     value={reg.observacion}
-                    onChange={(e) => setObservacion(a.personaId, e.target.value)}
+                    onChange={(e) =>
+                      setObservacion(a.inscripcionId, e.target.value)
+                    }
                     placeholder="💬 Nota u observación rápida (opcional)..."
                     style={{ fontSize: "0.8rem", height: "34px" }}
                   />
@@ -397,8 +428,12 @@ export default function AsistenciasPage() {
               marginTop: "16px",
             }}
           >
-            <button onClick={guardar} className="btn btn-success">
-              Guardar Planilla del Día
+            <button
+              onClick={guardar}
+              disabled={ocupado}
+              className="btn btn-success"
+            >
+              {ocupado ? "Guardando..." : "Guardar Planilla del Día"}
             </button>
             {/* Provisorio: abre el diálogo de impresión. El PDF real va en el paso 18 */}
             <button onClick={() => window.print()} className="btn btn-primary">

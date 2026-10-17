@@ -3,28 +3,32 @@
 import { useEffect, useState } from "react";
 import {
   contarAlumnosPorMateria,
+  contarClasesPorMateria,
   obtenerMisMaterias,
   type Materia,
 } from "@/lib/datos";
-import { obtenerPlanillas, type Planilla } from "@/lib/asistencias-demo";
 
 const ANIOS = [1, 2, 3, 4];
 
 export default function DashboardPage() {
   const [materias, setMaterias] = useState<Materia[]>([]);
   const [conteo, setConteo] = useState<Record<string, number>>({});
-  const [planillas, setPlanillas] = useState<Planilla[]>([]);
+  const [clases, setClases] = useState<Record<string, number>>({});
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState("");
 
   useEffect(() => {
     let activo = true;
-    Promise.all([obtenerMisMaterias(), contarAlumnosPorMateria()])
-      .then(([m, c]) => {
+    Promise.all([
+      obtenerMisMaterias(),
+      contarAlumnosPorMateria(),
+      contarClasesPorMateria(),
+    ])
+      .then(([m, c, cl]) => {
         if (!activo) return;
         setMaterias(m);
         setConteo(c);
-        setPlanillas(obtenerPlanillas());
+        setClases(cl);
         setCargando(false);
       })
       .catch((e: Error) => {
@@ -39,7 +43,7 @@ export default function DashboardPage() {
 
   const ids = materias.map((m) => m.id);
   const totalAlumnos = ids.reduce((suma, id) => suma + (conteo[id] ?? 0), 0);
-  const totalClases = planillas.filter((p) => ids.includes(p.materiaId)).length;
+  const totalClases = ids.reduce((suma, id) => suma + (clases[id] ?? 0), 0);
 
   const stats = [
     [materias.length, "materias a cargo"],
@@ -89,20 +93,15 @@ export default function DashboardPage() {
             return (
               <div key={anio}>
                 <div className="grupo-anio-header">🎓 {anio}.º Año</div>
-                {delAnio.map((m) => {
-                  const clases = planillas.filter(
-                    (p) => p.materiaId === m.id
-                  ).length;
-                  return (
-                    <div className="materia-row" key={m.id}>
-                      <strong>{m.nombre}</strong>
-                      <div className="materia-meta">
-                        👥 {conteo[m.id] ?? 0} Inscriptos | 📅 {clases} Clases
-                        registradas
-                      </div>
+                {delAnio.map((m) => (
+                  <div className="materia-row" key={m.id}>
+                    <strong>{m.nombre}</strong>
+                    <div className="materia-meta">
+                      👥 {conteo[m.id] ?? 0} Inscriptos | 📅 {clases[m.id] ?? 0}{" "}
+                      Clases registradas
                     </div>
-                  );
-                })}
+                  </div>
+                ))}
               </div>
             );
           })}
