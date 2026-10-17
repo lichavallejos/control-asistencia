@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { obtenerUsuario } from "@/lib/sesion";
-import { alumnos, cursos, type Curso } from "@/lib/datos-demo";
+import type { Curso } from "@/lib/datos-demo";
+import { obtenerAlumnos, obtenerMisCursos } from "@/lib/datos-local";
 import {
   eliminarPlanilla,
   guardarPlanilla,
@@ -10,8 +11,6 @@ import {
   obtenerPlanillas,
   type RegistroAlumno,
 } from "@/lib/asistencias-demo";
-
-
 
 const ANIOS = [1, 2, 3, 4];
 
@@ -29,7 +28,7 @@ function hoy() {
 function armarRegistros(cursoId: number, fecha: string): Registros {
   const planilla = obtenerPlanilla(cursoId, fecha);
   const resultado: Registros = {};
-  alumnos
+  obtenerAlumnos()
     .filter((a) => a.cursoId === cursoId)
     .forEach((a) => {
       const guardado = planilla?.registros.find((r) => r.alumnoId === a.id);
@@ -54,7 +53,7 @@ export default function AsistenciasPage() {
 
   if (!usuario) return null;
 
-  const misCursos = cursos.filter((c) => usuario.materias.includes(c.id));
+  const misCursos = obtenerMisCursos(usuario);
 
   function abrirCurso(c: Curso) {
     const f = hoy();
@@ -125,7 +124,7 @@ export default function AsistenciasPage() {
   }
 
   const alumnosCurso = curso
-    ? alumnos.filter(
+    ? obtenerAlumnos().filter(
         (a) =>
           a.cursoId === curso.id &&
           a.nombre.toLowerCase().includes(filtro.toLowerCase())

@@ -2,10 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { obtenerUsuario } from "@/lib/sesion";
-import { alumnos, cursos, type Profesor } from "@/lib/datos-demo";
+import type { Profesor } from "@/lib/datos-demo";
+import { obtenerAlumnos, obtenerMisCursos } from "@/lib/datos-local";
 import { obtenerPlanillas, type Planilla } from "@/lib/asistencias-demo";
-
-
 
 const ANIOS = [1, 2, 3, 4];
 
@@ -20,7 +19,8 @@ export default function DashboardPage() {
 
   if (!usuario) return null;
 
-  const misCursos = cursos.filter((c) => usuario.materias.includes(c.id));
+  const misCursos = obtenerMisCursos(usuario);
+  const alumnos = obtenerAlumnos();
   const idsMis = misCursos.map((c) => c.id);
 
   const stats = [
