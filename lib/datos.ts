@@ -39,7 +39,7 @@ function aError(error: ErrorSupabase, porDefecto: string): Error {
 // Supabase devuelve como máximo 1000 filas por consulta: esto las pide por tandas.
 const TAMANO_PAGINA = 1000;
 
-async function leerTodo<T>(
+export async function leerTodo<T>(
   pedir: (
     desde: number,
     hasta: number
