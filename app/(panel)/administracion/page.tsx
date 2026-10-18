@@ -4,13 +4,17 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { esAdministrador } from "@/lib/sesion";
 import {
+  asignarMateria,
   crearProfesor,
   editarProfesor,
   listarMateriasInstitucion,
   listarProfesores,
+  quitarMateria,
   type MateriaConProfesores,
   type Profesor,
 } from "@/lib/datos";
+
+const ANIOS = [1, 2, 3, 4];
 
 type FormProfesor = {
   id: string | null;
@@ -27,6 +31,8 @@ export default function AdministracionPage() {
   const [version, setVersion] = useState(0);
   const [formProfesor, setFormProfesor] = useState<FormProfesor | null>(null);
   const [guardando, setGuardando] = useState(false);
+  // Materia elegida en el selector de cada profesor (id del profesor -> id de la materia)
+  const [seleccion, setSeleccion] = useState<Record<string, string>>({});
 
   useEffect(() => {
     let activo = true;
@@ -92,6 +98,26 @@ export default function AdministracionPage() {
         await crearProfesor(nombre, dni, email);
       }
       setFormProfesor(null);
+      refrescar();
+    });
+  }
+
+  async function asignar(p: Profesor) {
+    const materiaId = seleccion[p.id];
+    if (!materiaId) return;
+    await ejecutar(async () => {
+      await asignarMateria(p.id, materiaId);
+      setSeleccion((actual) => ({ ...actual, [p.id]: "" }));
+      refrescar();
+    });
+  }
+
+  async function quitar(p: Profesor, m: MateriaConProfesores) {
+    // Solo se quita la asignación: clases, alumnos y asistencias quedan intactos
+    if (!confirm(`¿Quitar la materia "${m.nombre}" (${m.anio}.º Año) a ${p.nombre}?`))
+      return;
+    await ejecutar(async () => {
+      await quitarMateria(p.id, m.id);
       refrescar();
     });
   }
@@ -202,6 +228,9 @@ export default function AdministracionPage() {
 
         {profesores?.map((p) => {
           const suyas = materiasDe(p.id);
+          const disponibles = materias.filter(
+            (m) => !m.profesores.some((x) => x.id === p.id)
+          );
           return (
             <div className="alumno-card" key={p.id}>
               <div className="alumno-info">
@@ -222,11 +251,70 @@ export default function AdministracionPage() {
                   marginTop: "6px",
                 }}
               >
-                <strong>Materias:</strong>{" "}
-                {suyas.length === 0
-                  ? "Sin materias asignadas."
-                  : suyas.map((m) => `${m.nombre} (${m.anio}.º Año)`).join(", ")}
+                <strong>Materias:</strong>
+                {suyas.length === 0 && " Sin materias asignadas."}
               </div>
+              {suyas.map((m) => (
+                <div
+                  key={m.id}
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    gap: "8px",
+                    fontSize: "0.85rem",
+                    color: "var(--text-muted)",
+                    marginTop: "4px",
+                  }}
+                >
+                  <span>
+                    {m.nombre} ({m.anio}.º Año)
+                  </span>
+                  <button
+                    onClick={() => quitar(p, m)}
+                    disabled={guardando}
+                    className="btn btn-outline btn-sm"
+                    style={{ color: "var(--danger)" }}
+                    aria-label={`Quitar ${m.nombre}`}
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+              {disponibles.length > 0 && (
+                <div style={{ display: "flex", gap: "8px", marginTop: "8px" }}>
+                  <select
+                    value={seleccion[p.id] ?? ""}
+                    onChange={(e) =>
+                      setSeleccion({ ...seleccion, [p.id]: e.target.value })
+                    }
+                    aria-label={`Materia a asignar a ${p.nombre}`}
+                    style={{ flex: 1 }}
+                  >
+                    <option value="">Elegí una materia...</option>
+                    {ANIOS.map((anio) => {
+                      const delAnio = disponibles.filter((m) => m.anio === anio);
+                      if (delAnio.length === 0) return null;
+                      return (
+                        <optgroup key={anio} label={`🎓 ${anio}.º Año`}>
+                          {delAnio.map((m) => (
+                            <option key={m.id} value={m.id}>
+                              {m.nombre}
+                            </option>
+                          ))}
+                        </optgroup>
+                      );
+                    })}
+                  </select>
+                  <button
+                    onClick={() => asignar(p)}
+                    disabled={guardando || !seleccion[p.id]}
+                    className="btn btn-primary btn-sm"
+                  >
+                    Asignar
+                  </button>
+                </div>
+              )}
               <div style={{ marginTop: "6px" }}>
                 <button
                   onClick={() => abrirEditarProfesor(p)}
