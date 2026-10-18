@@ -63,9 +63,9 @@ export default function NuevaClavePage() {
                   El enlace no es válido o ya venció. Pedí uno nuevo e intentá
                   abrirlo en el mismo navegador desde el que lo pediste.
                 </p>
-                <p style={{ marginTop: "12px" }}>
-                  <Link href="/recuperar">Pedir un enlace nuevo</Link>
-                </p>
+                <Link href="/recuperar" className="enlace-form">
+                Pedir un enlace nuevo
+                </Link>
               </>
             )}
 
@@ -73,7 +73,7 @@ export default function NuevaClavePage() {
               <>
                 <p>Listo, tu contraseña se cambió correctamente.</p>
                 <p style={{ marginTop: "12px" }}>
-                  <Link href="/">Ir al inicio de sesión</Link>
+                  <Link href="/" className="enlace-form">Ir al inicio de sesión</Link>
                 </p>
               </>
             )}
