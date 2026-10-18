@@ -4,17 +4,29 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { esAdministrador } from "@/lib/sesion";
 import {
+  crearProfesor,
+  editarProfesor,
   listarMateriasInstitucion,
   listarProfesores,
   type MateriaConProfesores,
   type Profesor,
 } from "@/lib/datos";
 
+type FormProfesor = {
+  id: string | null;
+  nombre: string;
+  dni: string;
+  email: string;
+};
+
 export default function AdministracionPage() {
   const router = useRouter();
   const [profesores, setProfesores] = useState<Profesor[] | null>(null);
   const [materias, setMaterias] = useState<MateriaConProfesores[]>([]);
   const [error, setError] = useState("");
+  const [version, setVersion] = useState(0);
+  const [formProfesor, setFormProfesor] = useState<FormProfesor | null>(null);
+  const [guardando, setGuardando] = useState(false);
 
   useEffect(() => {
     let activo = true;
@@ -39,7 +51,50 @@ export default function AdministracionPage() {
     return () => {
       activo = false;
     };
-  }, [router]);
+  }, [router, version]);
+
+  const refrescar = () => setVersion((v) => v + 1);
+
+  async function ejecutar(accion: () => Promise<void>) {
+    setGuardando(true);
+    try {
+      await accion();
+    } catch (e) {
+      alert((e as Error).message);
+    } finally {
+      setGuardando(false);
+    }
+  }
+
+  function abrirNuevoProfesor() {
+    setFormProfesor({ id: null, nombre: "", dni: "", email: "" });
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function abrirEditarProfesor(p: Profesor) {
+    setFormProfesor({ id: p.id, nombre: p.nombre, dni: p.dni, email: p.email });
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  async function guardarProfesor() {
+    if (!formProfesor) return;
+    const nombre = formProfesor.nombre.trim();
+    const dni = formProfesor.dni.trim();
+    const email = formProfesor.email.trim();
+    if (!nombre) {
+      alert("Ingresa Apellido y Nombre.");
+      return;
+    }
+    await ejecutar(async () => {
+      if (formProfesor.id) {
+        await editarProfesor(formProfesor.id, nombre, dni, email);
+      } else {
+        await crearProfesor(nombre, dni, email);
+      }
+      setFormProfesor(null);
+      refrescar();
+    });
+  }
 
   // Materias que dicta cada profesor (a partir de la lista de materias)
   function materiasDe(profesorId: string): MateriaConProfesores[] {
@@ -61,8 +116,77 @@ export default function AdministracionPage() {
         </p>
       )}
 
+      {formProfesor && (
+        <div className="card" style={{ borderTopColor: "var(--accent)" }}>
+          <div className="card-title">
+            {formProfesor.id === null ? "Agregar Profesor Nuevo" : "Editar Profesor"}
+          </div>
+          <div className="form-group">
+            <label htmlFor="profesor-nombre">Apellido y Nombre</label>
+            <input
+              type="text"
+              id="profesor-nombre"
+              placeholder="Ej: Gomez, Laura"
+              value={formProfesor.nombre}
+              onChange={(e) =>
+                setFormProfesor({ ...formProfesor, nombre: e.target.value })
+              }
+            />
+          </div>
+          <div className="form-group">
+            <label htmlFor="profesor-dni">DNI</label>
+            <input
+              type="text"
+              id="profesor-dni"
+              placeholder="Ej: 30123456"
+              value={formProfesor.dni}
+              onChange={(e) =>
+                setFormProfesor({ ...formProfesor, dni: e.target.value })
+              }
+            />
+          </div>
+          <div className="form-group">
+            <label htmlFor="profesor-email">Correo</label>
+            <input
+              type="email"
+              id="profesor-email"
+              placeholder="Ej: laura@correo.com"
+              value={formProfesor.email}
+              onChange={(e) =>
+                setFormProfesor({ ...formProfesor, email: e.target.value })
+              }
+            />
+          </div>
+          <div style={{ display: "flex", gap: "10px" }}>
+            <button
+              onClick={guardarProfesor}
+              disabled={guardando}
+              className="btn btn-primary"
+              style={{ flex: 1 }}
+            >
+              Guardar
+            </button>
+            <button
+              onClick={() => setFormProfesor(null)}
+              className="btn btn-outline"
+              style={{ flex: 1 }}
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="card">
-        <div className="card-title">Profesores</div>
+        <div className="card-title">
+          <span>Profesores</span>
+          <button
+            onClick={abrirNuevoProfesor}
+            className="btn btn-outline btn-sm"
+          >
+            + Nuevo profesor
+          </button>
+        </div>
 
         {profesores === null && !error && (
           <p style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>
@@ -102,6 +226,15 @@ export default function AdministracionPage() {
                 {suyas.length === 0
                   ? "Sin materias asignadas."
                   : suyas.map((m) => `${m.nombre} (${m.anio}.º Año)`).join(", ")}
+              </div>
+              <div style={{ marginTop: "6px" }}>
+                <button
+                  onClick={() => abrirEditarProfesor(p)}
+                  className="btn btn-outline btn-sm"
+                  style={{ width: "100%" }}
+                >
+                  Editar
+                </button>
               </div>
             </div>
           );
