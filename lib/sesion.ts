@@ -151,3 +151,24 @@ export async function guardarClaveNueva(
   sessionStorage.removeItem(CLAVE_CACHE);
   return { ok: true };
 }
+// ---------- Administrador ----------
+
+// ¿La persona con la sesión iniciada es administradora?
+// La política RLS de "administradores" solo deja leer la fila propia:
+// si existe una fila, es administrador. Ante cualquier error devuelve false.
+export async function esAdministrador(): Promise<boolean> {
+  try {
+    const { data, error } = await crearClienteNavegador()
+      .from("administradores")
+      .select("persona_id")
+      .maybeSingle();
+    if (error) {
+      console.error(error);
+      return false;
+    }
+    return data !== null;
+  } catch (e) {
+    console.error(e);
+    return false;
+  }
+}

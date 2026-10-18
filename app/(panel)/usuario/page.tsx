@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { cerrarSesion, obtenerUsuario } from "@/lib/sesion";
+import { cerrarSesion, esAdministrador, obtenerUsuario } from "@/lib/sesion";
 import { obtenerMisMaterias, type Materia } from "@/lib/datos";
 import { generarRespaldo } from "@/lib/respaldo";
 
@@ -12,11 +12,12 @@ export default function UsuarioPage() {
   const [materias, setMaterias] = useState<Materia[] | null>(null);
   const [descargando, setDescargando] = useState(false);
   const [mensajeRespaldo, setMensajeRespaldo] = useState("");
-
+  const [esAdmin, setEsAdmin] = useState(false);
   useEffect(() => {
     obtenerMisMaterias()
       .then(setMaterias)
       .catch(() => setMaterias([]));
+      esAdministrador().then(setEsAdmin);
   }, []);
 
   if (!usuario) return null;
@@ -79,6 +80,11 @@ export default function UsuarioPage() {
           <p style={{ marginBottom: "8px" }}>
             <strong>Correo:</strong> {usuario.email}
           </p>
+                    {esAdmin && (
+            <p style={{ marginBottom: "8px" }}>
+              <strong>Rol:</strong> Administrador
+            </p>
+          )}
           <p style={{ fontSize: "0.88rem", color: "var(--text-muted)" }}>
             <strong>Materias:</strong> {textoMaterias}
           </p>
