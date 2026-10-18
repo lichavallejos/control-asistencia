@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import { restaurarUsuario } from "@/lib/sesion";
+import { esAdministrador, restaurarUsuario } from "@/lib/sesion";
 
 const items = [
   { ruta: "/dashboard", id: "dashboard", icono: " ", texto: "Inicio" },
@@ -19,6 +19,7 @@ export default function PanelLayout({
   const router = useRouter();
   const pathname = usePathname();
   const [nombre, setNombre] = useState<string | null>(null);
+  const [esAdmin, setEsAdmin] = useState(false);
 
   useEffect(() => {
     // Verifica con Supabase que la sesión siga vigente
@@ -28,6 +29,7 @@ export default function PanelLayout({
           router.replace("/");
         } else {
           setNombre(usuario.nombre);
+          esAdministrador().then(setEsAdmin);
         }
       })
       .catch(() => router.replace("/"));
@@ -35,6 +37,13 @@ export default function PanelLayout({
 
   // Mientras se verifica la sesión no se muestra nada
   if (!nombre) return null;
+    // El botón de Administración solo lo ven los administradores
+  const itemsNav = esAdmin
+    ? [
+        ...items,
+        { ruta: "/administracion", id: "administracion", icono: "⚙️", texto: "Administración" },
+      ]
+    : items;
 
   return (
     <div id="app-view" className="view active">
@@ -46,7 +55,7 @@ export default function PanelLayout({
       <main>{children}</main>
 
       <nav className="bottom-nav">
-        {items.map((item) => (
+        {itemsNav.map((item) => (
           <button
             key={item.id}
             id={`nav-${item.id}`}
