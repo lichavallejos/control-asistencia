@@ -64,7 +64,7 @@ export default function NuevaClavePage() {
                   abrirlo en el mismo navegador desde el que lo pediste.
                 </p>
                 <Link href="/recuperar" className="enlace-form">
-                Pedir un enlace nuevo
+                ← Pedir un enlace nuevo
                 </Link>
               </>
             )}
@@ -73,7 +73,7 @@ export default function NuevaClavePage() {
               <>
                 <p>Listo, tu contraseña se cambió correctamente.</p>
                 <p style={{ marginTop: "12px" }}>
-                  <Link href="/" className="enlace-form">Ir al inicio de sesión</Link>
+                  <Link href="/" className="enlace-form"> ← Ir al inicio de sesión</Link>
                 </p>
               </>
             )}

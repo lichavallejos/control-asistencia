@@ -73,7 +73,7 @@ export default function RecuperarPage() {
               {aviso && <p style={{ marginTop: "12px" }}>{aviso}</p>}
              
               <Link href="/" className="enlace-form">
-                Volver al inicio de sesión
+                ← Volver al inicio de sesión
               </Link>
 
             </form>
