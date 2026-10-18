@@ -25,12 +25,27 @@ type FilaInscripcion = {
   personas: { apellido_nombre: string; dni: string | null } | null;
 };
 
+const MENSAJES_ADMIN = [
+  "El nombre del profesor es obligatorio",
+  "El correo no es válido",
+  "Ya existe una persona con ese DNI",
+  "El profesor no existe en tu institución",
+  "La materia no existe en tu institución",
+];
+
 function aError(error: ErrorSupabase, porDefecto: string): Error {
   if (error.message.includes("personas_dni_unico")) {
     return new Error("Ya existe un alumno con ese DNI.");
   }
   if (error.message.includes("inscripciones_alumno_id_materia_id_key")) {
     return new Error("Ese alumno ya está inscripto en esta materia.");
+  }
+  const mensajeAdmin = MENSAJES_ADMIN.find((m) => error.message.includes(m));
+  if (mensajeAdmin) {
+    return new Error(mensajeAdmin);
+  }
+  if (error.message.includes("No autorizado")) {
+    return new Error("No tenés permiso para hacer esto.");
   }
   console.error(error);
   return new Error(porDefecto);
@@ -539,4 +554,118 @@ export async function obtenerResumenAsistencia(
   );
 
   return { totalClases: count ?? 0, porInscripcion: resumirAsistencias(filas) };
+}
+// ---------- Administración de profesores ----------
+// Usan las funciones de la migración 0004. Solo funcionan para administradores:
+// la base rechaza a cualquier otro aunque se llame desde el navegador.
+
+export type Profesor = {
+  id: string;
+  nombre: string;
+  dni: string;
+  email: string;
+  tieneCuenta: boolean;
+};
+
+export type MateriaConProfesores = {
+  id: string;
+  nombre: string;
+  anio: number;
+  profesores: { id: string; nombre: string }[];
+};
+
+type FilaProfesor = {
+  id: string;
+  apellido_nombre: string;
+  dni: string | null;
+  email: string | null;
+  tiene_cuenta: boolean;
+};
+
+type FilaMateriaConProfesores = {
+  id: string;
+  nombre: string;
+  anio: number;
+  profesores: { id: string; apellido_nombre: string }[];
+};
+
+export async function listarProfesores(): Promise<Profesor[]> {
+  const { data, error } = await crearClienteNavegador().rpc("listar_profesores");
+  if (error) throw aError(error, "No se pudieron cargar los profesores.");
+  return (data as FilaProfesor[]).map((f) => ({
+    id: f.id,
+    nombre: f.apellido_nombre,
+    dni: f.dni ?? "",
+    email: f.email ?? "",
+    tieneCuenta: f.tiene_cuenta,
+  }));
+}
+
+export async function crearProfesor(
+  nombre: string,
+  dni: string,
+  email: string
+): Promise<string> {
+  const { data, error } = await crearClienteNavegador().rpc("crear_profesor", {
+    p_nombre: nombre,
+    p_dni: dni,
+    p_email: email,
+  });
+  if (error) throw aError(error, "No se pudo crear el profesor.");
+  return data as string;
+}
+
+export async function editarProfesor(
+  id: string,
+  nombre: string,
+  dni: string,
+  email: string
+): Promise<void> {
+  const { error } = await crearClienteNavegador().rpc("editar_profesor", {
+    p_id: id,
+    p_nombre: nombre,
+    p_dni: dni,
+    p_email: email,
+  });
+  if (error) throw aError(error, "No se pudo guardar los cambios.");
+}
+
+export async function listarMateriasInstitucion(): Promise<
+  MateriaConProfesores[]
+> {
+  const { data, error } = await crearClienteNavegador().rpc(
+    "listar_materias_institucion"
+  );
+  if (error) throw aError(error, "No se pudieron cargar las materias.");
+  return (data as FilaMateriaConProfesores[]).map((f) => ({
+    id: f.id,
+    nombre: f.nombre,
+    anio: f.anio,
+    profesores: f.profesores.map((p) => ({
+      id: p.id,
+      nombre: p.apellido_nombre,
+    })),
+  }));
+}
+
+export async function asignarMateria(
+  profesorId: string,
+  materiaId: string
+): Promise<void> {
+  const { error } = await crearClienteNavegador().rpc("asignar_materia", {
+    p_profesor: profesorId,
+    p_materia: materiaId,
+  });
+  if (error) throw aError(error, "No se pudo asignar la materia.");
+}
+
+export async function quitarMateria(
+  profesorId: string,
+  materiaId: string
+): Promise<void> {
+  const { error } = await crearClienteNavegador().rpc("quitar_materia", {
+    p_profesor: profesorId,
+    p_materia: materiaId,
+  });
+  if (error) throw aError(error, "No se pudo quitar la materia.");
 }
