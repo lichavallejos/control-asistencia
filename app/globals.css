@@ -234,3 +234,25 @@
       body { display: block !important; min-height: 0 !important; height: auto !important; padding: 0 !important; margin: 0 !important; background: #fff !important; }
       #contenedor-impresion { display: block !important; position: static !important; width: 100% !important; margin: 0 !important; padding: 15mm !important; box-sizing: border-box !important; }
     }
+    /* Enlaces de los formularios (olvidaste contraseña, volver, etc.) */
+    .enlace-form {
+      display: block;
+      margin-top: 14px;
+      text-align: center;
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--primary-dark);
+      text-decoration: none;
+      transition: color 0.2s ease;
+    }
+
+    .enlace-form:hover {
+      color: var(--primary-darker);
+      text-decoration: underline;
+    }
+
+    .enlace-form:focus-visible {
+      outline: 2px solid var(--primary);
+      outline-offset: 3px;
+      border-radius: var(--radius);
+    }

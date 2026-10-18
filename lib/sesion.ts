@@ -88,3 +88,66 @@ export async function cerrarSesion() {
   await supabase.auth.signOut();
   sessionStorage.removeItem(CLAVE_CACHE);
 }
+
+// ---------- Recuperar contraseña ----------
+
+export type ResultadoSimple = { ok: true } | { ok: false; error: string };
+
+// Pide a Supabase que mande el correo con el enlace de recuperación.
+// El enlace vuelve a esta misma app, a la página /nueva-clave.
+export async function pedirEnlaceRecuperacion(
+  email: string
+): Promise<ResultadoSimple> {
+  const correo = email.trim();
+  if (!correo || !correo.includes("@")) {
+    return { ok: false, error: "Escribí un correo válido." };
+  }
+
+  const { error } = await crearClienteNavegador().auth.resetPasswordForEmail(
+    correo,
+    { redirectTo: `${window.location.origin}/nueva-clave` }
+  );
+  if (error) {
+    console.error(error);
+    return {
+      ok: false,
+      error: "No se pudo enviar el correo. Probá de nuevo en unos minutos.",
+    };
+  }
+  return { ok: true };
+}
+
+// Indica si la página se abrió con un enlace de recuperación válido
+// (o con una sesión vigente). Espera a que Supabase termine de leer el enlace.
+export async function hayEnlaceDeRecuperacion(): Promise<boolean> {
+  const { data } = await crearClienteNavegador().auth.getSession();
+  return !!data.session;
+}
+
+// Guarda la contraseña nueva y cierra la sesión de recuperación,
+// para que se entre de nuevo por el login normal.
+export async function guardarClaveNueva(
+  password: string
+): Promise<ResultadoSimple> {
+  if (password.length < 8) {
+    return {
+      ok: false,
+      error: "La contraseña debe tener al menos 8 caracteres.",
+    };
+  }
+
+  const supabase = crearClienteNavegador();
+  const { error } = await supabase.auth.updateUser({ password });
+  if (error) {
+    console.error(error);
+    return {
+      ok: false,
+      error:
+        "No se pudo cambiar la contraseña. Pedí un enlace nuevo e intentá de nuevo.",
+    };
+  }
+
+  await supabase.auth.signOut();
+  sessionStorage.removeItem(CLAVE_CACHE);
+  return { ok: true };
+}

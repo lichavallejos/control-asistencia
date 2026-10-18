@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { iniciarSesion } from "@/lib/sesion";
 
 export default function LoginPage() {
@@ -76,6 +77,9 @@ export default function LoginPage() {
                 <span></span>
               </div>
               <p id="login-error" className="error-msg">{error}</p>
+                           <Link href="/recuperar" className="enlace-form">
+                ¿Olvidaste tu contraseña?
+              </Link>
             </form>
           </div>
         </div>
