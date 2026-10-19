@@ -19,6 +19,7 @@ import { obtenerUsuario } from "@/lib/sesion";
 import InformeAsistencia, {
   type DatosInforme,
 } from "@/components/attendance/InformeAsistencia";
+import PlanillaAsistencia from "@/components/attendance/PlanillaAsistencia";
 
 const ANIOS = [1, 2, 3, 4];
 
@@ -65,6 +66,7 @@ export default function AsistenciasPage() {
   const [historialAbierto, setHistorialAbierto] = useState(false);
   const [ocupado, setOcupado] = useState(false);
   const [informe, setInforme] = useState<DatosInforme | null>(null);
+  const [faltantes, setFaltantes] = useState<string[]>([]);
 
   // Evita que una respuesta lenta pise a una más nueva al cambiar de fecha rápido
   const ultimaSolicitud = useRef(0);
@@ -156,6 +158,7 @@ export default function AsistenciasPage() {
       setMateria(m);
       setFecha(f);
       setFiltro("");
+      setFaltantes([]);
       setHistorialAbierto(false);
     } catch (e) {
       alert((e as Error).message);
@@ -166,6 +169,7 @@ export default function AsistenciasPage() {
 
   async function cambiarFecha(f: string) {
     setFecha(f);
+    setFaltantes([]);
     if (!materia || !f) return;
     try {
       await cargarFecha(materia, alumnos, f);
@@ -174,8 +178,15 @@ export default function AsistenciasPage() {
     }
   }
 
-  function setEstado(id: string, estado: EstadoAsistencia) {
-    setRegistros((prev) => ({ ...prev, [id]: { ...prev[id], estado } }));
+  // Cambia el estado de uno o varios alumnos a la vez (por inscripción)
+  function setEstados(ids: string[], estado: EstadoAsistencia) {
+    setRegistros((prev) => {
+      const nuevo: Registros = { ...prev };
+      ids.forEach((id) => {
+        if (nuevo[id]) nuevo[id] = { ...nuevo[id], estado };
+      });
+      return nuevo;
+    });
   }
 
   function setMotivo(id: string, motivo: string) {
@@ -186,22 +197,32 @@ export default function AsistenciasPage() {
     setRegistros((prev) => ({ ...prev, [id]: { ...prev[id], observacion } }));
   }
 
-  function marcarTodos(estado: EstadoAsistencia) {
-    setRegistros((prev) => {
-      const nuevo: Registros = {};
-      Object.values(prev).forEach((r) => {
-        nuevo[r.inscripcionId] = { ...r, estado };
-      });
-      return nuevo;
-    });
-  }
-
   async function guardar() {
     if (!materia) return;
     if (!fecha) {
       alert("Selecciona una fecha válida.");
       return;
     }
+    // El comentario es obligatorio en las ausencias justificadas
+    const sinComentario = Object.values(registros)
+      .filter(
+        (r) =>
+          r.estado === "ausente" &&
+          r.motivo === "justificada" &&
+          !r.observacion.trim()
+      )
+      .map((r) => r.inscripcionId);
+    if (sinComentario.length > 0) {
+      setFaltantes(sinComentario);
+      const n = sinComentario.length;
+      alert(
+        n === 1
+          ? "Falta el comentario obligatorio de 1 ausencia justificada."
+          : `Faltan los comentarios obligatorios de ${n} ausencias justificadas.`
+      );
+      return;
+    }
+    setFaltantes([]);
     setOcupado(true);
     try {
       await guardarAsistencia(materia.id, fecha, Object.values(registros));
@@ -292,11 +313,22 @@ export default function AsistenciasPage() {
       )}
 
       {materia && (
-        <div className="card">
-          <div className="card-title">
+        <>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: "12px",
+              flexWrap: "wrap",
+              marginBottom: "14px",
+            }}
+          >
             <div>
-              <span>{materia.nombre}</span>
-              <span className="badge badge-anio" style={{ marginLeft: "6px" }}>
+              <span style={{ fontWeight: 700, fontSize: "1.1rem" }}>
+                {materia.nombre}
+              </span>
+              <span className="badge badge-anio" style={{ marginLeft: "8px" }}>
                 {materia.anio}.º Año
               </span>
             </div>
@@ -359,116 +391,21 @@ export default function AsistenciasPage() {
             </div>
           )}
 
-          <div className="form-group">
-            <label htmlFor="fecha-asistencia">Fecha de la Clase</label>
-            <input
-              type="date"
-              id="fecha-asistencia"
-              value={fecha}
-              onChange={(e) => cambiarFecha(e.target.value)}
-            />
-          </div>
-
-          <div className="quick-actions">
-            <button
-              onClick={() => marcarTodos("presente")}
-              className="btn btn-outline btn-sm"
-              style={{
-                flex: 1,
-                color: "var(--primary-dark)",
-                borderColor: "var(--success)",
-              }}
-            >
-              🟢 Todos Presentes
-            </button>
-            <button
-              onClick={() => marcarTodos("ausente")}
-              className="btn btn-outline btn-sm"
-              style={{ flex: 1, color: "#c0392b", borderColor: "var(--danger)" }}
-            >
-              🔴 Todos Ausentes
-            </button>
-          </div>
-
-          <div className="form-group">
-            <input
-              type="text"
-              placeholder="Buscar alumno..."
-              value={filtro}
-              onChange={(e) => setFiltro(e.target.value)}
-            />
-          </div>
-
-          <div>
-            {alumnosFiltrados.length === 0 && (
-              <p
-                style={{
-                  fontSize: "0.85rem",
-                  color: "var(--text-muted)",
-                  padding: "12px 0",
-                }}
-              >
-                No hay alumnos para mostrar.
-              </p>
-            )}
-            {alumnosFiltrados.map((a) => {
-              const reg = registros[a.inscripcionId];
-              if (!reg) return null;
-              const esPresente = reg.estado === "presente";
-              return (
-                <div
-                  className="alumno-card"
-                  key={a.inscripcionId}
-                  data-estado={reg.estado}
-                >
-                  <div className="alumno-info">
-                    <span className="alumno-nombre">{a.nombre}</span>
-                    <span className="badge badge-success">
-                      DNI {a.dni || "S/D"}
-                    </span>
-                  </div>
-
-                  <div className="btn-toggle-container">
-                    <button
-                      type="button"
-                      className={`btn-estado btn-estado-presente ${esPresente ? "active" : ""}`}
-                      onClick={() => setEstado(a.inscripcionId, "presente")}
-                    >
-                      ➕ Presente
-                    </button>
-                    <button
-                      type="button"
-                      className={`btn-estado btn-estado-ausente ${!esPresente ? "active" : ""}`}
-                      onClick={() => setEstado(a.inscripcionId, "ausente")}
-                    >
-                      ✖ Ausente
-                    </button>
-                  </div>
-
-                  {!esPresente && (
-                    <select
-                      value={reg.motivo}
-                      onChange={(e) => setMotivo(a.inscripcionId, e.target.value)}
-                      style={{ borderColor: "var(--danger)", marginTop: "4px" }}
-                    >
-                      <option value="injustificada">Ausencia Injustificada</option>
-                      <option value="justificada">Ausencia Justificada</option>
-                    </select>
-                  )}
-
-                  <input
-                    type="text"
-                    value={reg.observacion}
-                    onChange={(e) =>
-                      setObservacion(a.inscripcionId, e.target.value)
-                    }
-                    placeholder="💬 Nota u observación rápida (opcional)..."
-                    style={{ fontSize: "0.8rem", height: "34px" }}
-                  />
-                </div>
-              );
-            })}
-          </div>
+          <PlanillaAsistencia
+            alumnos={alumnos}
+            visibles={alumnosFiltrados}
+            registros={registros}
+            fecha={fecha}
+            filtro={filtro}
+            ocupado={ocupado}
+            faltantes={faltantes}
+            onFecha={cambiarFecha}
+            onFiltro={setFiltro}
+            onEstado={setEstados}
+            onMotivo={setMotivo}
+            onObservacion={setObservacion}
+            onGuardar={guardar}
+          />
 
           <div
             style={{
@@ -478,13 +415,6 @@ export default function AsistenciasPage() {
               marginTop: "16px",
             }}
           >
-            <button
-              onClick={guardar}
-              disabled={ocupado}
-              className="btn btn-success"
-            >
-              {ocupado ? "Guardando..." : "Guardar Planilla del Día"}
-            </button>
             <button
               onClick={exportarPDF}
               disabled={ocupado}
@@ -496,7 +426,7 @@ export default function AsistenciasPage() {
               Volver a Selección
             </button>
           </div>
-        </div>
+        </>
       )}
       {informe && <InformeAsistencia datos={informe} />}
     </section>
