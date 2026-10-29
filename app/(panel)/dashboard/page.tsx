@@ -83,8 +83,8 @@ export default function DashboardPage() {
           )}
           {!cargando && materias.length === 0 && (
             <p style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>
-              No hay materias registradas. Creá la primera desde la pestaña
-              Alumnos.
+              No tenés materias asignadas todavía. Pedile al administrador que te
+              las asigne.
             </p>
           )}
           {ANIOS.map((anio) => {

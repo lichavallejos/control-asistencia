@@ -83,15 +83,6 @@ export async function obtenerMisMaterias(): Promise<Materia[]> {
   return data as Materia[];
 }
 
-export async function crearMateria(nombre: string, anio: number): Promise<string> {
-  const { data, error } = await crearClienteNavegador().rpc("crear_materia", {
-    p_nombre: nombre,
-    p_anio: anio,
-  });
-  if (error) throw aError(error, "No se pudo crear la materia.");
-  return data as string;
-}
-
 // ---------- Alumnos ----------
 
 export async function obtenerAlumnosDeMateria(

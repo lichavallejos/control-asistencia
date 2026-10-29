@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import {
   agregarAlumno,
-  crearMateria,
   editarAlumno,
   matricularLista,
   obtenerAlumnosDeMateria,
@@ -27,10 +26,6 @@ export default function AlumnosPage() {
   const [error, setError] = useState("");
   const [version, setVersion] = useState(0);
   const [filtro, setFiltro] = useState("");
-
-  const [formMateriaAbierto, setFormMateriaAbierto] = useState(false);
-  const [materiaNombre, setMateriaNombre] = useState("");
-  const [materiaAnio, setMateriaAnio] = useState(1);
 
   const [formAlumno, setFormAlumno] = useState<FormAlumno | null>(null);
   const [cargaAbierta, setCargaAbierta] = useState(false);
@@ -95,22 +90,6 @@ export default function AlumnosPage() {
     } finally {
       setGuardando(false);
     }
-  }
-
-  async function guardarMateria() {
-    const nombre = materiaNombre.trim();
-    if (!nombre) {
-      alert("Ingresa el nombre de la materia.");
-      return;
-    }
-    await ejecutar(async () => {
-      const id = await crearMateria(nombre, materiaAnio);
-      setMateriaNombre("");
-      setFormMateriaAbierto(false);
-      setMateriaId(id);
-      refrescar();
-      alert(`✅ Materia '${nombre}' guardada para ${materiaAnio}.º Año.`);
-    });
   }
 
   function abrirNuevoAlumno() {
@@ -194,59 +173,11 @@ export default function AlumnosPage() {
       )}
 
       <div className="card">
-        <div className="card-title">
-          <span>Nueva Materia</span>
-          <button
-            onClick={() => setFormMateriaAbierto(!formMateriaAbierto)}
-            className="btn btn-outline btn-sm"
-          >
-            + Crear Materia
-          </button>
-        </div>
-        {formMateriaAbierto && (
-          <div style={{ marginTop: "10px" }}>
-            <div className="form-group">
-              <label htmlFor="nueva-materia-nombre">Nombre de la Materia</label>
-              <input
-                type="text"
-                id="nueva-materia-nombre"
-                placeholder="Ej: Sujetos de la Educación"
-                value={materiaNombre}
-                onChange={(e) => setMateriaNombre(e.target.value)}
-              />
-            </div>
-            <div className="form-group">
-              <label htmlFor="nueva-materia-anio">Año de Cursada</label>
-              <select
-                id="nueva-materia-anio"
-                value={materiaAnio}
-                onChange={(e) => setMateriaAnio(Number(e.target.value))}
-              >
-                {ANIOS.map((a) => (
-                  <option key={a} value={a}>
-                    {a}.º Año
-                  </option>
-                ))}
-              </select>
-            </div>
-            <button
-              onClick={guardarMateria}
-              disabled={guardando}
-              className="btn btn-primary btn-sm"
-              style={{ width: "100%" }}
-            >
-              Guardar Materia
-            </button>
-          </div>
-        )}
-      </div>
-
-      <div className="card">
         <div className="card-title">Gestión de Alumnos</div>
 
         {!cargando && materias.length === 0 ? (
           <p style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>
-            Todavía no tenés materias. Creá la primera con “+ Crear Materia”.
+            Todavía no tenés materias asignadas. Pedile al administrador que te asigne las tuyas.
           </p>
         ) : (
           <>
