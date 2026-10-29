@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import {
-  eliminarClase,
   guardarAsistencia,
   obtenerAlumnosDeMateria,
   obtenerAsistenciaDeClase,
@@ -82,7 +81,8 @@ export default function AsistenciasPage() {
     obtenerMisMaterias()
       .then((lista) => {
         if (!activo) return;
-        setMaterias(lista);
+        // El profesor no ve acá las materias inactivas (siguen visibles en Alumnos)
+        setMaterias(lista.filter((m) => m.activo));
         setCargando(false);
       })
       .catch((e: Error) => {
@@ -246,21 +246,6 @@ export default function AsistenciasPage() {
     }
   }
 
-  async function eliminarFecha(clase: ClaseGuardada) {
-    if (!materia) return;
-    if (!confirm(`¿Eliminar la asistencia del día ${clase.fecha}?`)) return;
-    setOcupado(true);
-    try {
-      await eliminarClase(clase.id);
-      setClases(await obtenerClases(materia.id));
-      if (clase.fecha === fecha) await cargarFecha(materia, alumnos, fecha);
-    } catch (e) {
-      alert((e as Error).message);
-    } finally {
-      setOcupado(false);
-    }
-  }
-
   async function cargarDesdeHistorial(f: string) {
     await cambiarFecha(f);
     setHistorialAbierto(false);
@@ -297,8 +282,8 @@ export default function AsistenciasPage() {
             )}
             {!cargando && materias.length === 0 && (
               <p style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>
-                No tienes materias asignadas. Creá la primera desde la pestaña
-                Alumnos.
+                No tenés materias activas asignadas. Pedile al administrador que
+                te asigne las tuyas.
               </p>
             )}
             {ANIOS.map((anio) => {
@@ -382,22 +367,12 @@ export default function AsistenciasPage() {
                     <span style={{ fontSize: "0.85rem", fontWeight: 600 }}>
                       📅 {c.fecha}
                     </span>
-                    <div style={{ display: "flex", gap: "6px" }}>
-                      <button
-                        onClick={() => cargarDesdeHistorial(c.fecha)}
-                        className="btn btn-primary btn-sm"
-                      >
-                        Cargar
-                      </button>
-                      <button
-                        onClick={() => eliminarFecha(c)}
-                        disabled={ocupado}
-                        className="btn btn-outline btn-sm"
-                        style={{ color: "var(--danger)" }}
-                      >
-                        🗑️
-                      </button>
-                    </div>
+                    <button
+                      onClick={() => cargarDesdeHistorial(c.fecha)}
+                      className="btn btn-primary btn-sm"
+                    >
+                      Cargar
+                    </button>
                   </div>
                 ))}
               </div>

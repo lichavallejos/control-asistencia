@@ -7,6 +7,7 @@ export type Materia = {
   id: string;
   nombre: string;
   anio: number;
+  activo: boolean; // el administrador desactiva (no borra): una inactiva es de solo lectura
 };
 
 // Un alumno visto dentro de una materia
@@ -88,7 +89,7 @@ export async function leerTodo<T>(
 export async function obtenerMisMaterias(): Promise<Materia[]> {
   const { data, error } = await crearClienteNavegador()
     .from("materias")
-    .select("id, nombre, anio")
+    .select("id, nombre, anio, activo")
     .order("anio")
     .order("nombre");
   if (error) throw aError(error, "No se pudieron cargar las materias.");
@@ -349,15 +350,6 @@ export async function guardarAsistencia(
     .from("asistencias")
     .upsert(filas, { onConflict: "clase_id,inscripcion_id" });
   if (errorAsist) throw aError(errorAsist, "No se pudo guardar la asistencia.");
-}
-
-// Borra la clase y, con ella, toda su asistencia
-export async function eliminarClase(claseId: string): Promise<void> {
-  const { error } = await crearClienteNavegador()
-    .from("clases")
-    .delete()
-    .eq("id", claseId);
-  if (error) throw aError(error, "No se pudo eliminar la clase.");
 }
 
 // Cantidad de clases registradas por materia (para el panel de inicio)
