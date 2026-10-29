@@ -15,6 +15,7 @@ export type AlumnoDeMateria = {
   personaId: string; // la persona
   nombre: string;
   dni: string;
+  fechaBaja: string | null; // AAAA-MM-DD; vacía si el alumno está activo
 };
 
 type ErrorSupabase = { message: string; code?: string };
@@ -22,6 +23,7 @@ type ErrorSupabase = { message: string; code?: string };
 type FilaInscripcion = {
   id: string;
   alumno_id: string;
+  fecha_baja: string | null;
   personas: { apellido_nombre: string; dni: string | null } | null;
 };
 
@@ -31,6 +33,11 @@ const MENSAJES_ADMIN = [
   "Ya existe una persona con ese DNI",
   "El profesor no existe en tu institución",
   "La materia no existe en tu institución",
+  "La fecha de baja no puede ser futura",
+  "El alumno ya está de baja",
+  "El alumno no está de baja",
+  "La inscripción no existe en tus materias",
+  "La materia está inactiva o su ciclo está cerrado: solo lectura",
 ];
 
 function aError(error: ErrorSupabase, porDefecto: string): Error {
@@ -43,6 +50,11 @@ function aError(error: ErrorSupabase, porDefecto: string): Error {
   const mensajeAdmin = MENSAJES_ADMIN.find((m) => error.message.includes(m));
   if (mensajeAdmin) {
     return new Error(mensajeAdmin);
+  }
+  if (error.message.includes("row-level security")) {
+    return new Error(
+      "No se pudo guardar: la materia está en solo lectura (inactiva o con el ciclo cerrado) o no tenés permiso."
+    );
   }
   if (error.message.includes("No autorizado")) {
     return new Error("No tenés permiso para hacer esto.");
@@ -90,7 +102,7 @@ export async function obtenerAlumnosDeMateria(
 ): Promise<AlumnoDeMateria[]> {
   const { data, error } = await crearClienteNavegador()
     .from("inscripciones")
-    .select("id, alumno_id, personas ( apellido_nombre, dni )")
+    .select("id, alumno_id, fecha_baja, personas ( apellido_nombre, dni )")
     .eq("materia_id", materiaId);
   if (error) throw aError(error, "No se pudieron cargar los alumnos.");
 
@@ -101,18 +113,19 @@ export async function obtenerAlumnosDeMateria(
       personaId: fila.alumno_id,
       nombre: fila.personas?.apellido_nombre ?? "",
       dni: fila.personas?.dni ?? "",
+      fechaBaja: fila.fecha_baja,
     }))
     .sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
 }
 
-// Cantidad de alumnos por materia (para el panel de inicio)
+// Cantidad de alumnos ACTIVOS por materia (los dados de baja no cuentan)
 export async function contarAlumnosPorMateria(): Promise<Record<string, number>> {
   const supabase = crearClienteNavegador();
-  const filas = await leerTodo<{ materia_id: string }>(
+  const filas = await leerTodo<{ materia_id: string; fecha_baja: string | null }>(
     (desde, hasta) =>
       supabase
         .from("inscripciones")
-        .select("materia_id")
+        .select("materia_id, fecha_baja")
         .order("id")
         .range(desde, hasta),
     "No se pudo contar los alumnos."
@@ -120,6 +133,7 @@ export async function contarAlumnosPorMateria(): Promise<Record<string, number>>
 
   const conteo: Record<string, number> = {};
   filas.forEach((f) => {
+    if (f.fecha_baja) return;
     conteo[f.materia_id] = (conteo[f.materia_id] ?? 0) + 1;
   });
   return conteo;
@@ -193,13 +207,20 @@ export async function editarAlumno(
   }
 }
 
-// "Eliminar" quita al alumno de esta materia (no lo borra del sistema)
-export async function quitarAlumnoDeMateria(inscripcionId: string): Promise<void> {
-  const { error } = await crearClienteNavegador()
-    .from("inscripciones")
-    .delete()
-    .eq("id", inscripcionId);
-  if (error) throw aError(error, "No se pudo quitar al alumno.");
+// Dar de baja NO borra nada: el alumno deja de contar asistencias desde esa fecha
+// (por defecto, hoy) y el historial se conserva. Se puede revertir.
+export async function darDeBajaAlumno(inscripcionId: string): Promise<void> {
+  const { error } = await crearClienteNavegador().rpc("dar_de_baja", {
+    p_inscripcion: inscripcionId,
+  });
+  if (error) throw aError(error, "No se pudo dar de baja al alumno.");
+}
+
+export async function revertirBajaAlumno(inscripcionId: string): Promise<void> {
+  const { error } = await crearClienteNavegador().rpc("revertir_baja", {
+    p_inscripcion: inscripcionId,
+  });
+  if (error) throw aError(error, "No se pudo revertir la baja.");
 }
 
 // Carga masiva: un nombre por línea. Devuelve cuántos se inscribieron.

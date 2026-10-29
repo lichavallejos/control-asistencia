@@ -3,12 +3,13 @@
 import { useEffect, useState } from "react";
 import {
   agregarAlumno,
+  darDeBajaAlumno,
   editarAlumno,
   matricularLista,
   obtenerAlumnosDeMateria,
   obtenerEstadisticasMateria,
   obtenerMisMaterias,
-  quitarAlumnoDeMateria,
+  revertirBajaAlumno,
   type AlumnoDeMateria,
   type EstadisticasMateria,
   type Materia,
@@ -17,6 +18,12 @@ import {
 const ANIOS = [1, 2, 3, 4];
 
 type FormAlumno = { personaId: string | null; nombre: string; dni: string };
+
+// "2026-10-28" -> "28/10/2026"
+function fechaLegible(f: string): string {
+  const [anio, mes, dia] = f.split("-");
+  return `${dia}/${mes}/${anio}`;
+}
 
 export default function AlumnosPage() {
   const [materias, setMaterias] = useState<Materia[]>([]);
@@ -121,10 +128,24 @@ export default function AlumnosPage() {
     });
   }
 
-  async function quitarAlumno(a: AlumnoDeMateria) {
-    if (!confirm(`¿Quitar a ${a.nombre} de esta materia?`)) return;
+  async function darDeBaja(a: AlumnoDeMateria) {
+    if (
+      !confirm(
+        `¿Dar de baja a ${a.nombre}? Deja de contar asistencias desde hoy. No se borra nada y la baja se puede revertir.`
+      )
+    )
+      return;
     await ejecutar(async () => {
-      await quitarAlumnoDeMateria(a.inscripcionId);
+      await darDeBajaAlumno(a.inscripcionId);
+      refrescar();
+    });
+  }
+
+  async function revertirBaja(a: AlumnoDeMateria) {
+    if (!confirm(`¿Revertir la baja de ${a.nombre}? Vuelve a contar asistencias.`))
+      return;
+    await ejecutar(async () => {
+      await revertirBajaAlumno(a.inscripcionId);
       refrescar();
     });
   }
@@ -357,7 +378,13 @@ export default function AlumnosPage() {
                         DNI: {a.dni || "Sin datos"}
                       </div>
                     </div>
-                    <span className={`badge ${badgeClass}`}>{pct}% Asist.</span>
+                    {a.fechaBaja ? (
+                      <span className="badge badge-warning">
+                        De baja desde {fechaLegible(a.fechaBaja)}
+                      </span>
+                    ) : (
+                      <span className={`badge ${badgeClass}`}>{pct}% Asist.</span>
+                    )}
                   </div>
                   <div style={{ display: "flex", gap: "8px", marginTop: "6px" }}>
                     <button
@@ -367,13 +394,25 @@ export default function AlumnosPage() {
                     >
                       Editar
                     </button>
-                    <button
-                      onClick={() => quitarAlumno(a)}
-                      className="btn btn-outline btn-sm"
-                      style={{ flex: 1, color: "var(--danger)" }}
-                    >
-                      Quitar
-                    </button>
+                    {a.fechaBaja ? (
+                      <button
+                        onClick={() => revertirBaja(a)}
+                        disabled={guardando}
+                        className="btn btn-outline btn-sm"
+                        style={{ flex: 1 }}
+                      >
+                        Revertir baja
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => darDeBaja(a)}
+                        disabled={guardando}
+                        className="btn btn-outline btn-sm"
+                        style={{ flex: 1, color: "var(--danger)" }}
+                      >
+                        Dar de baja
+                      </button>
+                    )}
                   </div>
                 </div>
               );
