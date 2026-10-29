@@ -33,6 +33,12 @@ function hoy() {
   return `${d.getFullYear()}-${mes}-${dia}`;
 }
 
+// Un alumno cuenta en una fecha si no tiene baja, o si la baja es posterior a esa fecha
+// (la base rechaza asistencias de clases posteriores a la baja).
+function activoEn(alumno: AlumnoDeMateria, fecha: string): boolean {
+  return !alumno.fechaBaja || fecha <= alumno.fechaBaja;
+}
+
 // Usa lo ya guardado para esa fecha; los alumnos sin registro quedan presentes
 // (igual que en el HTML original).
 function armarRegistros(
@@ -97,7 +103,12 @@ export default function AsistenciasPage() {
     const numero = ++ultimaSolicitud.current;
     const guardados = await obtenerAsistenciaDeClase(m.id, f);
     if (numero !== ultimaSolicitud.current) return;
-    setRegistros(armarRegistros(lista, guardados));
+    setRegistros(
+      armarRegistros(
+        lista.filter((a) => activoEn(a, f)),
+        guardados
+      )
+    );
   }
 
   // Cuando el informe ya está dibujado, abre el diálogo de impresión / guardar como PDF
@@ -255,8 +266,10 @@ export default function AsistenciasPage() {
     setHistorialAbierto(false);
   }
 
+  // Solo los alumnos que estaban activos en la fecha elegida
+  const alumnosEnFecha = fecha ? alumnos.filter((a) => activoEn(a, fecha)) : alumnos;
   const textoFiltro = filtro.toLowerCase();
-  const alumnosFiltrados = alumnos.filter((a) =>
+  const alumnosFiltrados = alumnosEnFecha.filter((a) =>
     a.nombre.toLowerCase().includes(textoFiltro)
   );
 
@@ -392,7 +405,7 @@ export default function AsistenciasPage() {
           )}
 
           <PlanillaAsistencia
-            alumnos={alumnos}
+            alumnos={alumnosEnFecha}
             visibles={alumnosFiltrados}
             registros={registros}
             fecha={fecha}
