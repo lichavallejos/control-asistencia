@@ -7,11 +7,11 @@ import {
   editarAlumno,
   matricularLista,
   obtenerAlumnosDeMateria,
-  obtenerEstadisticasMateria,
+  obtenerPorcentajesMateria,
   obtenerMisMaterias,
   revertirBajaAlumno,
   type AlumnoDeMateria,
-  type EstadisticasMateria,
+  type PorcentajeAlumno,
   type Materia,
 } from "@/lib/datos";
 
@@ -39,11 +39,8 @@ export default function AlumnosPage() {
   const [textoMasivo, setTextoMasivo] = useState("");
   const [guardando, setGuardando] = useState(false);
 
-  // Para calcular el % de asistencia de cada alumno
-  const [stats, setStats] = useState<EstadisticasMateria>({
-    totalClases: 0,
-    presentesPorInscripcion: {},
-  });
+  // % de asistencia de cada alumno (lo calcula la base, por inscripción)
+  const [porcentajes, setPorcentajes] = useState<Record<string, PorcentajeAlumno>>({});
 
   // Cargar materias
   useEffect(() => {
@@ -71,12 +68,12 @@ export default function AlumnosPage() {
     let activo = true;
     Promise.all([
       obtenerAlumnosDeMateria(materiaId),
-      obtenerEstadisticasMateria(materiaId),
+      obtenerPorcentajesMateria(materiaId),
     ])
-      .then(([lista, estadisticas]) => {
+      .then(([lista, calculados]) => {
         if (!activo) return;
         setAlumnos(lista);
-        setStats(estadisticas);
+        setPorcentajes(calculados);
       })
       .catch((e: Error) => {
         if (activo) setError(e.message);
@@ -358,16 +355,19 @@ export default function AlumnosPage() {
               </p>
             )}
             {alumnosFiltrados.map((a) => {
-              const totalClases = stats.totalClases;
-              const presentes = stats.presentesPorInscripcion[a.inscripcionId] ?? 0;
-              const pct =
-                totalClases > 0
-                  ? Math.round((presentes / totalClases) * 100)
-                  : 100;
-
-              let badgeClass = "badge-success";
-              if (pct < 65) badgeClass = "badge-danger";
-              else if (pct < 75) badgeClass = "badge-warning";
+              const p = porcentajes[a.inscripcionId];
+              const badgeClass =
+                p?.color === "verde"
+                  ? "badge-success"
+                  : p?.color === "amarillo"
+                  ? "badge-warning"
+                  : p?.color === "rojo"
+                  ? "badge-danger"
+                  : "";
+              const textoPct =
+                p && p.porcentaje !== null
+                  ? `${p.porcentaje.toFixed(2).replace(".", ",")} % Asist.`
+                  : "Sin clases";
 
               return (
                 <div className="alumno-card" key={a.inscripcionId}>
@@ -383,7 +383,7 @@ export default function AlumnosPage() {
                         De baja desde {fechaLegible(a.fechaBaja)}
                       </span>
                     ) : (
-                      <span className={`badge ${badgeClass}`}>{pct}% Asist.</span>
+                      <span className={`badge ${badgeClass}`}>{textoPct}</span>
                     )}
                   </div>
                   <div style={{ display: "flex", gap: "8px", marginTop: "6px" }}>

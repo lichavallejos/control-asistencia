@@ -372,42 +372,41 @@ export async function contarClasesPorMateria(): Promise<Record<string, number>> 
   return conteo;
 }
 
-export type EstadisticasMateria = {
-  totalClases: number;
-  presentesPorInscripcion: Record<string, number>;
+export type PorcentajeAlumno = {
+  clases: number; // clases contadas para este alumno (hasta su baja, si la tiene)
+  asistidas: number; // presentes + ausentes justificadas
+  porcentaje: number | null; // truncado a 2 decimales; vacío si todavía no hay clases
+  color: "verde" | "amarillo" | "rojo" | null;
 };
 
-// Para calcular el % de asistencia de cada alumno de una materia
-export async function obtenerEstadisticasMateria(
+// El porcentaje y el color salen de la base (umbrales del ciclo lectivo):
+// la pantalla solo los muestra, no calcula nada.
+export async function obtenerPorcentajesMateria(
   materiaId: string
-): Promise<EstadisticasMateria> {
-  const supabase = crearClienteNavegador();
-
-  const { count, error } = await supabase
-    .from("clases")
-    .select("id", { count: "exact", head: true })
-    .eq("materia_id", materiaId);
-  if (error) throw aError(error, "No se pudieron calcular las estadísticas.");
-
-  const filas = await leerTodo<{ inscripcion_id: string }>(
-    (desde, hasta) =>
-      supabase
-        .from("asistencias")
-        .select("inscripcion_id")
-        .eq("materia_id", materiaId)
-        .eq("estado", "presente")
-        .order("id")
-        .range(desde, hasta),
-    "No se pudieron calcular las estadísticas."
-  );
-
-  const presentesPorInscripcion: Record<string, number> = {};
-  filas.forEach((f) => {
-    presentesPorInscripcion[f.inscripcion_id] =
-      (presentesPorInscripcion[f.inscripcion_id] ?? 0) + 1;
+): Promise<Record<string, PorcentajeAlumno>> {
+  const { data, error } = await crearClienteNavegador().rpc("porcentajes_materia", {
+    p_materia: materiaId,
   });
+  if (error) throw aError(error, "No se pudieron calcular los porcentajes.");
 
-  return { totalClases: count ?? 0, presentesPorInscripcion };
+  type Fila = {
+    inscripcion_id: string;
+    clases_acumuladas: number;
+    asistidas_acumuladas: number;
+    porcentaje_acumulado: number | string | null;
+    color: PorcentajeAlumno["color"];
+  };
+  const resultado: Record<string, PorcentajeAlumno> = {};
+  ((data ?? []) as Fila[]).forEach((f) => {
+    resultado[f.inscripcion_id] = {
+      clases: f.clases_acumuladas,
+      asistidas: f.asistidas_acumuladas,
+      porcentaje:
+        f.porcentaje_acumulado === null ? null : Number(f.porcentaje_acumulado),
+      color: f.color,
+    };
+  });
+  return resultado;
 }
 
 // ---------- Importación desde el sistema anterior ----------
