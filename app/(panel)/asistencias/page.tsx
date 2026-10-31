@@ -38,18 +38,21 @@ function activoEn(alumno: AlumnoDeMateria, fecha: string): boolean {
   return !alumno.fechaBaja || fecha <= alumno.fechaBaja;
 }
 
-// Usa lo ya guardado para esa fecha; los alumnos sin registro quedan presentes
-// (igual que en el HTML original).
+// Usa lo ya guardado para esa fecha. Los alumnos sin registro:
+// - si la clase es NUEVA, arrancan presentes (el profesor marca a los ausentes);
+// - si la clase YA EXISTE, figuran ausentes injustificados, igual que en el
+//   porcentaje (quien se inscribió después arrastra las ausencias anteriores).
 function armarRegistros(
   alumnos: AlumnoDeMateria[],
-  guardados: RegistroAsistencia[]
+  guardados: RegistroAsistencia[],
+  claseExiste: boolean
 ): Registros {
   const resultado: Registros = {};
   alumnos.forEach((a) => {
     const g = guardados.find((r) => r.inscripcionId === a.inscripcionId);
     resultado[a.inscripcionId] = {
       inscripcionId: a.inscripcionId,
-      estado: g?.estado ?? "presente",
+      estado: g?.estado ?? (claseExiste ? "ausente" : "presente"),
       motivo: g?.motivo || "injustificada",
       observacion: g?.observacion ?? "",
     };
@@ -98,7 +101,8 @@ export default function AsistenciasPage() {
   async function cargarFecha(
     m: Materia,
     lista: AlumnoDeMateria[],
-    f: string
+    f: string,
+    claseExiste: boolean
   ) {
     const numero = ++ultimaSolicitud.current;
     const guardados = await obtenerAsistenciaDeClase(m.id, f);
@@ -106,7 +110,8 @@ export default function AsistenciasPage() {
     setRegistros(
       armarRegistros(
         lista.filter((a) => activoEn(a, f)),
-        guardados
+        guardados,
+        claseExiste
       )
     );
   }
@@ -163,7 +168,7 @@ export default function AsistenciasPage() {
         obtenerClases(m.id),
       ]);
       const f = hoy();
-      await cargarFecha(m, lista, f);
+      await cargarFecha(m, lista, f, historial.some((c) => c.fecha === f));
       setAlumnos(lista);
       setClases(historial);
       setMateria(m);
@@ -183,7 +188,7 @@ export default function AsistenciasPage() {
     setFaltantes([]);
     if (!materia || !f) return;
     try {
-      await cargarFecha(materia, alumnos, f);
+      await cargarFecha(materia, alumnos, f, clases.some((c) => c.fecha === f));
     } catch (e) {
       alert((e as Error).message);
     }
