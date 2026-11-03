@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { esAdministrador } from "@/lib/sesion";
 import NavAdministracion from "@/components/NavAdministracion";
@@ -195,6 +196,18 @@ export default function CarrerasPage() {
               {!c.activo && <span className="badge badge-warning">Inactiva</span>}
             </div>
             <div style={{ display: "flex", gap: "8px", marginTop: "8px" }}>
+              <Link
+                href={`/administracion/carreras/${c.id}`}
+                className="btn btn-outline btn-sm"
+                style={{
+                  flex: 1,
+                  display: "inline-block",
+                  textAlign: "center",
+                  textDecoration: "none",
+                }}
+              >
+                Materias
+              </Link>
               <button
                 onClick={() => abrirEditar(c)}
                 disabled={guardando}

@@ -47,6 +47,17 @@ const MENSAJES_ADMIN = [
   "Ya existe un ciclo lectivo para ese año",
   "El ciclo no existe en tu institución",
   "El ciclo está cerrado: reabrilo para editarlo",
+  "El nombre de la materia es obligatorio",
+  "La carrera es obligatoria",
+  "El ciclo lectivo es obligatorio",
+  "Una materia anual no lleva cuatrimestre",
+  "Una materia cuatrimestral necesita cuatrimestre (1 o 2)",
+  "La carrera está desactivada: reactivala para crear materias",
+  "El ciclo está cerrado: reabrilo para crear materias",
+  "El ciclo está cerrado: reabrilo para editar la materia",
+  "La carrera de destino está desactivada: reactivala para mover materias a ella",
+  "Ya existe una materia con ese nombre, año y cuatrimestre en esa carrera y ciclo",
+  "Hay que indicar si la materia queda activa o inactiva",
 ];
 
 function aError(error: ErrorSupabase, porDefecto: string): Error {
@@ -868,4 +879,127 @@ export async function reabrirCiclo(id: string): Promise<void> {
     p_id: id,
   });
   if (error) throw aError(error, "No se pudo reabrir el ciclo.");
+}
+
+// ---------- Administración de materias ----------
+// Usan las funciones de las migraciones 0006 y 0007. Solo funcionan para
+// administradores. El administrador no borra materias: las desactiva.
+// Una materia nace en un ciclo y no cambia de ciclo; no se crean ni se editan
+// materias en un ciclo cerrado ni en una carrera desactivada.
+
+export type MateriaAdmin = {
+  id: string;
+  nombre: string;
+  anio: number;
+  tipo: "materia" | "taller";
+  duracion: "anual" | "cuatrimestral";
+  cuatrimestre: number | null;
+  carreraId: string;
+  carreraNombre: string;
+  carreraActiva: boolean;
+  cicloId: string;
+  cicloAnio: number;
+  cicloEstado: "abierto" | "cerrado";
+  activo: boolean;
+  profesores: { id: string; nombre: string }[];
+};
+
+type FilaMateriaAdmin = {
+  id: string;
+  nombre: string;
+  anio: number;
+  tipo: "materia" | "taller";
+  duracion: "anual" | "cuatrimestral";
+  cuatrimestre: number | null;
+  carrera_id: string;
+  carrera_nombre: string;
+  carrera_activa: boolean;
+  ciclo_id: string;
+  ciclo_anio: number;
+  ciclo_estado: "abierto" | "cerrado";
+  activo: boolean;
+  profesores: { id: string; apellido_nombre: string }[];
+};
+
+export type DatosMateria = {
+  nombre: string;
+  anio: number;
+  tipo: "materia" | "taller";
+  duracion: "anual" | "cuatrimestral";
+  cuatrimestre: number | null; // solo si la duración es cuatrimestral
+};
+
+// Todas las materias de la institución (activas, inactivas y de ciclos cerrados).
+export async function listarMateriasAdmin(): Promise<MateriaAdmin[]> {
+  const { data, error } = await crearClienteNavegador().rpc(
+    "listar_materias_institucion"
+  );
+  if (error) throw aError(error, "No se pudieron cargar las materias.");
+  return (data as FilaMateriaAdmin[]).map((f) => ({
+    id: f.id,
+    nombre: f.nombre,
+    anio: f.anio,
+    tipo: f.tipo,
+    duracion: f.duracion,
+    cuatrimestre: f.cuatrimestre,
+    carreraId: f.carrera_id,
+    carreraNombre: f.carrera_nombre,
+    carreraActiva: f.carrera_activa,
+    cicloId: f.ciclo_id,
+    cicloAnio: f.ciclo_anio,
+    cicloEstado: f.ciclo_estado,
+    activo: f.activo,
+    profesores: f.profesores.map((p) => ({
+      id: p.id,
+      nombre: p.apellido_nombre,
+    })),
+  }));
+}
+
+export async function crearMateriaAdmin(
+  datos: DatosMateria,
+  carreraId: string,
+  cicloId: string
+): Promise<string> {
+  const { data, error } = await crearClienteNavegador().rpc("crear_materia", {
+    p_nombre: datos.nombre,
+    p_anio: datos.anio,
+    p_tipo: datos.tipo,
+    p_duracion: datos.duracion,
+    p_cuatrimestre: datos.cuatrimestre,
+    p_carrera_id: carreraId,
+    p_ciclo_id: cicloId,
+  });
+  if (error) throw aError(error, "No se pudo crear la materia.");
+  return data as string;
+}
+
+export async function editarMateriaAdmin(
+  id: string,
+  datos: DatosMateria,
+  carreraId: string
+): Promise<void> {
+  const { error } = await crearClienteNavegador().rpc("editar_materia", {
+    p_id: id,
+    p_nombre: datos.nombre,
+    p_anio: datos.anio,
+    p_tipo: datos.tipo,
+    p_duracion: datos.duracion,
+    p_cuatrimestre: datos.cuatrimestre,
+    p_carrera_id: carreraId,
+  });
+  if (error) throw aError(error, "No se pudo guardar los cambios de la materia.");
+}
+
+// Una materia desactivada deja de verla el profesor en Asistencia; el
+// administrador y la planilla PDF la siguen mostrando. No se borra nada.
+export async function cambiarEstadoMateria(
+  id: string,
+  activo: boolean
+): Promise<void> {
+  const { error } = await crearClienteNavegador().rpc("cambiar_estado_materia", {
+    p_id: id,
+    p_activo: activo,
+  });
+  if (error) throw aError(error, "No se pudo cambiar el estado de la materia.");
 }
