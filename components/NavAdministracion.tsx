@@ -1,10 +1,11 @@
 import Link from "next/link";
 
-type Pantalla = "profesores" | "carreras";
+type Pantalla = "profesores" | "carreras" | "ciclos";
 
 const ACCESOS: { id: Pantalla; texto: string; ruta: string }[] = [
   { id: "profesores", texto: "Profesores", ruta: "/administracion" },
   { id: "carreras", texto: "Carreras", ruta: "/administracion/carreras" },
+  { id: "ciclos", texto: "Ciclos", ruta: "/administracion/ciclos" },
 ];
 
 // Fila de accesos arriba de cada pantalla de administración.

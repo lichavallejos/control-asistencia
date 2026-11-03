@@ -43,6 +43,10 @@ const MENSAJES_ADMIN = [
   "Ya existe una carrera con ese nombre",
   "La carrera no existe en tu institución",
   "Hay que indicar si la carrera queda activa o inactiva",
+  "El año del ciclo es obligatorio",
+  "Ya existe un ciclo lectivo para ese año",
+  "El ciclo no existe en tu institución",
+  "El ciclo está cerrado: reabrilo para editarlo",
 ];
 
 function aError(error: ErrorSupabase, porDefecto: string): Error {
@@ -51,6 +55,31 @@ function aError(error: ErrorSupabase, porDefecto: string): Error {
   }
   if (error.message.includes("inscripciones_alumno_id_materia_id_key")) {
     return new Error("Ese alumno ya está inscripto en esta materia.");
+  }
+  // Reglas de la tabla de ciclos (las avisa la base con el nombre de la restricción)
+  if (error.message.includes("ciclos_umbrales_validos")) {
+    return new Error(
+      "Los umbrales no son válidos: el de regular tiene que ser menor al de aprobado, y el de aprobado no puede pasar de 100."
+    );
+  }
+  if (
+    error.message.includes("ciclos_cuat1_orden") ||
+    error.message.includes("ciclos_cuat2_orden")
+  ) {
+    return new Error(
+      "En cada cuatrimestre, la fecha de inicio no puede ser posterior a la de fin."
+    );
+  }
+  if (error.message.includes("ciclos_cuats_sin_pisarse")) {
+    return new Error(
+      "El 1.er cuatrimestre tiene que terminar antes de que empiece el 2.º."
+    );
+  }
+  if (error.message.includes("ciclos_anio_valido")) {
+    return new Error("El año del ciclo tiene que estar entre 2000 y 2100.");
+  }
+  if (error.message.includes("ciclos_anio_unico")) {
+    return new Error("Ya existe un ciclo lectivo para ese año.");
   }
   const mensajeAdmin = MENSAJES_ADMIN.find((m) => error.message.includes(m));
   if (mensajeAdmin) {
@@ -733,4 +762,110 @@ export async function cambiarEstadoCarrera(
     p_activo: activo,
   });
   if (error) throw aError(error, "No se pudo cambiar el estado de la carrera.");
+}
+
+// ---------- Administración de ciclos lectivos ----------
+// La lectura sale de la tabla (la política deja ver los ciclos de la propia
+// institución); crear, editar, cerrar y reabrir son funciones de la base que
+// exigen ser administrador. Las fechas viajan como texto "aaaa-mm-dd".
+
+export type Ciclo = {
+  id: string;
+  anio: number;
+  estado: "abierto" | "cerrado";
+  inicio1: string | null;
+  fin1: string | null;
+  inicio2: string | null;
+  fin2: string | null;
+  umbralAprobado: number;
+  umbralRegular: number;
+};
+
+export type FechasCiclo = {
+  inicio1: string | null;
+  fin1: string | null;
+  inicio2: string | null;
+  fin2: string | null;
+};
+
+type FilaCiclo = {
+  id: string;
+  anio: number;
+  estado: "abierto" | "cerrado";
+  inicio_cuatrimestre_1: string | null;
+  fin_cuatrimestre_1: string | null;
+  inicio_cuatrimestre_2: string | null;
+  fin_cuatrimestre_2: string | null;
+  umbral_aprobado: number | string;
+  umbral_regular: number | string;
+};
+
+export async function listarCiclos(): Promise<Ciclo[]> {
+  const { data, error } = await crearClienteNavegador()
+    .from("ciclos_lectivos")
+    .select(
+      "id, anio, estado, inicio_cuatrimestre_1, fin_cuatrimestre_1, inicio_cuatrimestre_2, fin_cuatrimestre_2, umbral_aprobado, umbral_regular"
+    )
+    .order("anio", { ascending: false });
+  if (error) throw aError(error, "No se pudieron cargar los ciclos lectivos.");
+  return (data as FilaCiclo[]).map((f) => ({
+    id: f.id,
+    anio: f.anio,
+    estado: f.estado,
+    inicio1: f.inicio_cuatrimestre_1,
+    fin1: f.fin_cuatrimestre_1,
+    inicio2: f.inicio_cuatrimestre_2,
+    fin2: f.fin_cuatrimestre_2,
+    umbralAprobado: Number(f.umbral_aprobado),
+    umbralRegular: Number(f.umbral_regular),
+  }));
+}
+
+// Los umbrales no se envían: la base los copia del ciclo anterior (o usa 85 y 75).
+export async function crearCiclo(
+  anio: number,
+  fechas: FechasCiclo
+): Promise<string> {
+  const { data, error } = await crearClienteNavegador().rpc("crear_ciclo", {
+    p_anio: anio,
+    p_inicio_1: fechas.inicio1,
+    p_fin_1: fechas.fin1,
+    p_inicio_2: fechas.inicio2,
+    p_fin_2: fechas.fin2,
+  });
+  if (error) throw aError(error, "No se pudo crear el ciclo lectivo.");
+  return data as string;
+}
+
+export async function editarCiclo(
+  id: string,
+  fechas: FechasCiclo,
+  umbralAprobado: number,
+  umbralRegular: number
+): Promise<void> {
+  const { error } = await crearClienteNavegador().rpc("editar_ciclo", {
+    p_id: id,
+    p_inicio_1: fechas.inicio1,
+    p_fin_1: fechas.fin1,
+    p_inicio_2: fechas.inicio2,
+    p_fin_2: fechas.fin2,
+    p_umbral_aprobado: umbralAprobado,
+    p_umbral_regular: umbralRegular,
+  });
+  if (error) throw aError(error, "No se pudo guardar los cambios del ciclo.");
+}
+
+// Un ciclo cerrado deja sus materias en solo lectura; se puede reabrir.
+export async function cerrarCiclo(id: string): Promise<void> {
+  const { error } = await crearClienteNavegador().rpc("cerrar_ciclo", {
+    p_id: id,
+  });
+  if (error) throw aError(error, "No se pudo cerrar el ciclo.");
+}
+
+export async function reabrirCiclo(id: string): Promise<void> {
+  const { error } = await crearClienteNavegador().rpc("reabrir_ciclo", {
+    p_id: id,
+  });
+  if (error) throw aError(error, "No se pudo reabrir el ciclo.");
 }
