@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { esAdministrador } from "@/lib/sesion";
+import NavAdministracion from "@/components/NavAdministracion";
 import {
   asignarMateria,
   crearProfesor,
@@ -135,6 +136,8 @@ export default function AdministracionPage() {
         <h2 className="section__title">Administración</h2>
         <div className="section__line"></div>
       </div>
+
+      <NavAdministracion actual="profesores" />
 
       {error && (
         <p className="error-msg" style={{ marginBottom: "12px" }}>

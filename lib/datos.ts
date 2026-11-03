@@ -39,6 +39,10 @@ const MENSAJES_ADMIN = [
   "El alumno no está de baja",
   "La inscripción no existe en tus materias",
   "La materia está inactiva o su ciclo está cerrado: solo lectura",
+  "El nombre de la carrera es obligatorio",
+  "Ya existe una carrera con ese nombre",
+  "La carrera no existe en tu institución",
+  "Hay que indicar si la carrera queda activa o inactiva",
 ];
 
 function aError(error: ErrorSupabase, porDefecto: string): Error {
@@ -671,4 +675,62 @@ export async function quitarMateria(
     p_materia: materiaId,
   });
   if (error) throw aError(error, "No se pudo quitar la materia.");
+}
+
+// ---------- Administración de carreras ----------
+// Usan las funciones de la migración 0007. Solo funcionan para administradores:
+// la base rechaza a cualquier otro aunque se llame desde el navegador.
+// El administrador no borra carreras: las desactiva.
+
+export type Carrera = {
+  id: string;
+  nombre: string;
+  activo: boolean;
+  cantidadMaterias: number;
+};
+
+type FilaCarrera = {
+  id: string;
+  nombre: string;
+  activo: boolean;
+  cantidad_materias: number | string; // la base devuelve un bigint
+};
+
+export async function listarCarreras(): Promise<Carrera[]> {
+  const { data, error } = await crearClienteNavegador().rpc("listar_carreras");
+  if (error) throw aError(error, "No se pudieron cargar las carreras.");
+  return (data as FilaCarrera[]).map((f) => ({
+    id: f.id,
+    nombre: f.nombre,
+    activo: f.activo,
+    cantidadMaterias: Number(f.cantidad_materias),
+  }));
+}
+
+export async function crearCarrera(nombre: string): Promise<string> {
+  const { data, error } = await crearClienteNavegador().rpc("crear_carrera", {
+    p_nombre: nombre,
+  });
+  if (error) throw aError(error, "No se pudo crear la carrera.");
+  return data as string;
+}
+
+export async function editarCarrera(id: string, nombre: string): Promise<void> {
+  const { error } = await crearClienteNavegador().rpc("editar_carrera", {
+    p_id: id,
+    p_nombre: nombre,
+  });
+  if (error) throw aError(error, "No se pudo guardar los cambios.");
+}
+
+// Desactivar una carrera NO desactiva sus materias.
+export async function cambiarEstadoCarrera(
+  id: string,
+  activo: boolean
+): Promise<void> {
+  const { error } = await crearClienteNavegador().rpc("cambiar_estado_carrera", {
+    p_id: id,
+    p_activo: activo,
+  });
+  if (error) throw aError(error, "No se pudo cambiar el estado de la carrera.");
 }
