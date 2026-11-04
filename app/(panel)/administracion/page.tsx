@@ -8,14 +8,12 @@ import {
   asignarMateria,
   crearProfesor,
   editarProfesor,
-  listarMateriasInstitucion,
+  listarMateriasAdmin,
   listarProfesores,
   quitarMateria,
-  type MateriaConProfesores,
+  type MateriaAdmin,
   type Profesor,
 } from "@/lib/datos";
-
-const ANIOS = [1, 2, 3, 4];
 
 type FormProfesor = {
   id: string | null;
@@ -24,10 +22,57 @@ type FormProfesor = {
   email: string;
 };
 
+// Texto que distingue materias parecidas: año, cuatrimestre, carrera y ciclo
+function descripcionMateria(m: MateriaAdmin): string {
+  const cuatrimestre =
+    m.duracion === "cuatrimestral"
+      ? ` · ${m.cuatrimestre === 1 ? "1.er" : "2.º"} cuat.`
+      : "";
+  const estado = !m.activo
+    ? " · Inactiva"
+    : m.cicloEstado === "cerrado"
+    ? " · Ciclo cerrado"
+    : "";
+  return `${m.nombre} (${m.anio}.º Año${cuatrimestre}) · ${m.carreraNombre} · Ciclo ${m.cicloAnio}${estado}`;
+}
+
+// Texto de cada opción del selector (la carrera y el año van en el grupo)
+function etiquetaOpcion(m: MateriaAdmin): string {
+  const cuatrimestre =
+    m.duracion === "cuatrimestral"
+      ? ` · ${m.cuatrimestre === 1 ? "1.er" : "2.º"} cuat.`
+      : "";
+  return `${m.nombre}${cuatrimestre} · Ciclo ${m.cicloAnio}`;
+}
+
+// Agrupa las materias por carrera y año, ordenadas, para el selector
+function agruparParaSelector(
+  lista: MateriaAdmin[]
+): { etiqueta: string; materias: MateriaAdmin[] }[] {
+  const ordenadas = [...lista].sort(
+    (a, b) =>
+      a.carreraNombre.localeCompare(b.carreraNombre, "es") ||
+      a.anio - b.anio ||
+      b.cicloAnio - a.cicloAnio ||
+      a.nombre.localeCompare(b.nombre, "es")
+  );
+  const grupos: { etiqueta: string; materias: MateriaAdmin[] }[] = [];
+  for (const m of ordenadas) {
+    const etiqueta = `${m.carreraNombre} · ${m.anio}.º Año`;
+    const ultimo = grupos[grupos.length - 1];
+    if (ultimo && ultimo.etiqueta === etiqueta) {
+      ultimo.materias.push(m);
+    } else {
+      grupos.push({ etiqueta, materias: [m] });
+    }
+  }
+  return grupos;
+}
+
 export default function AdministracionPage() {
   const router = useRouter();
   const [profesores, setProfesores] = useState<Profesor[] | null>(null);
-  const [materias, setMaterias] = useState<MateriaConProfesores[]>([]);
+  const [materias, setMaterias] = useState<MateriaAdmin[]>([]);
   const [error, setError] = useState("");
   const [version, setVersion] = useState(0);
   const [formProfesor, setFormProfesor] = useState<FormProfesor | null>(null);
@@ -45,7 +90,7 @@ export default function AdministracionPage() {
           router.replace("/dashboard");
           return null;
         }
-        return Promise.all([listarProfesores(), listarMateriasInstitucion()]);
+        return Promise.all([listarProfesores(), listarMateriasAdmin()]);
       })
       .then((resultado) => {
         if (!activo || !resultado) return;
@@ -113,9 +158,9 @@ export default function AdministracionPage() {
     });
   }
 
-  async function quitar(p: Profesor, m: MateriaConProfesores) {
+  async function quitar(p: Profesor, m: MateriaAdmin) {
     // Solo se quita la asignación: clases, alumnos y asistencias quedan intactos
-    if (!confirm(`¿Quitar la materia "${m.nombre}" (${m.anio}.º Año) a ${p.nombre}?`))
+    if (!confirm(`¿Quitar la materia ${descripcionMateria(m)} a ${p.nombre}?`))
       return;
     await ejecutar(async () => {
       await quitarMateria(p.id, m.id);
@@ -124,7 +169,7 @@ export default function AdministracionPage() {
   }
 
   // Materias que dicta cada profesor (a partir de la lista de materias)
-  function materiasDe(profesorId: string): MateriaConProfesores[] {
+  function materiasDe(profesorId: string): MateriaAdmin[] {
     return materias.filter((m) =>
       m.profesores.some((p) => p.id === profesorId)
     );
@@ -231,8 +276,12 @@ export default function AdministracionPage() {
 
         {profesores?.map((p) => {
           const suyas = materiasDe(p.id);
+          // Solo se asignan materias activas de ciclos abiertos
           const disponibles = materias.filter(
-            (m) => !m.profesores.some((x) => x.id === p.id)
+            (m) =>
+              m.activo &&
+              m.cicloEstado === "abierto" &&
+              !m.profesores.some((x) => x.id === p.id)
           );
           return (
             <div className="alumno-card" key={p.id}>
@@ -271,7 +320,7 @@ export default function AdministracionPage() {
                   }}
                 >
                   <span>
-                    {m.nombre} ({m.anio}.º Año)
+                    {descripcionMateria(m)}
                   </span>
                   <button
                     onClick={() => quitar(p, m)}
@@ -295,19 +344,15 @@ export default function AdministracionPage() {
                     style={{ flex: 1 }}
                   >
                     <option value="">Elegí una materia...</option>
-                    {ANIOS.map((anio) => {
-                      const delAnio = disponibles.filter((m) => m.anio === anio);
-                      if (delAnio.length === 0) return null;
-                      return (
-                        <optgroup key={anio} label={`🎓 ${anio}.º Año`}>
-                          {delAnio.map((m) => (
-                            <option key={m.id} value={m.id}>
-                              {m.nombre}
-                            </option>
-                          ))}
-                        </optgroup>
-                      );
-                    })}
+                    {agruparParaSelector(disponibles).map((g) => (
+                      <optgroup key={g.etiqueta} label={`🎓 ${g.etiqueta}`}>
+                        {g.materias.map((m) => (
+                          <option key={m.id} value={m.id}>
+                            {etiquetaOpcion(m)}
+                          </option>
+                        ))}
+                      </optgroup>
+                    ))}
                   </select>
                   <button
                     onClick={() => asignar(p)}
