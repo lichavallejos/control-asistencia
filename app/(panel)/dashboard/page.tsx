@@ -5,13 +5,35 @@ import {
   contarAlumnosPorMateria,
   contarClasesPorMateria,
   obtenerMisMaterias,
-  type Materia,
+  type MateriaPropia,
 } from "@/lib/datos";
 
-const ANIOS = [1, 2, 3, 4];
+// Agrupa las materias por carrera y año, ordenadas
+function agruparPorCarreraYAnio(
+  lista: MateriaPropia[]
+): { etiqueta: string; materias: MateriaPropia[] }[] {
+  const ordenadas = [...lista].sort(
+    (a, b) =>
+      a.carreraNombre.localeCompare(b.carreraNombre, "es") ||
+      a.anio - b.anio ||
+      (a.cuatrimestre ?? 0) - (b.cuatrimestre ?? 0) ||
+      a.nombre.localeCompare(b.nombre, "es")
+  );
+  const grupos: { etiqueta: string; materias: MateriaPropia[] }[] = [];
+  for (const m of ordenadas) {
+    const etiqueta = `${m.carreraNombre} · ${m.anio}.º Año`;
+    const ultimo = grupos[grupos.length - 1];
+    if (ultimo && ultimo.etiqueta === etiqueta) {
+      ultimo.materias.push(m);
+    } else {
+      grupos.push({ etiqueta, materias: [m] });
+    }
+  }
+  return grupos;
+}
 
 export default function DashboardPage() {
-  const [materias, setMaterias] = useState<Materia[]>([]);
+  const [materias, setMaterias] = useState<MateriaPropia[]>([]);
   const [conteo, setConteo] = useState<Record<string, number>>({});
   const [clases, setClases] = useState<Record<string, number>>({});
   const [cargando, setCargando] = useState(true);
@@ -41,12 +63,16 @@ export default function DashboardPage() {
     };
   }, []);
 
-  const ids = materias.map((m) => m.id);
+  // El Inicio muestra solo lo que se dicta ahora: materias activas de ciclos abiertos
+  const vigentes = materias.filter(
+    (m) => m.activo && m.cicloEstado === "abierto"
+  );
+  const ids = vigentes.map((m) => m.id);
   const totalAlumnos = ids.reduce((suma, id) => suma + (conteo[id] ?? 0), 0);
   const totalClases = ids.reduce((suma, id) => suma + (clases[id] ?? 0), 0);
 
   const stats = [
-    [materias.length, "materias a cargo"],
+    [vigentes.length, "materias a cargo"],
     [totalAlumnos, "estudiantes inscriptos"],
     [totalClases, "clases registradas"],
   ] as const;
@@ -87,24 +113,32 @@ export default function DashboardPage() {
               las asigne.
             </p>
           )}
-          {ANIOS.map((anio) => {
-            const delAnio = materias.filter((m) => m.anio === anio);
-            if (delAnio.length === 0) return null;
-            return (
-              <div key={anio}>
-                <div className="grupo-anio-header"> {anio}.º Año</div>
-                {delAnio.map((m) => (
-                  <div className="materia-row" key={m.id}>
-                    <strong>{m.nombre}</strong>
-                    <div className="materia-meta">
-                      👥 {conteo[m.id] ?? 0} Inscriptos | {clases[m.id] ?? 0}{" "}
-                      Clases registradas
-                    </div>
+          {!cargando && materias.length > 0 && vigentes.length === 0 && (
+            <p style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>
+              No tenés materias activas en un ciclo abierto. Las anteriores se
+              consultan en la pantalla de Alumnos.
+            </p>
+          )}
+          {agruparPorCarreraYAnio(vigentes).map((g) => (
+            <div key={g.etiqueta}>
+              <div className="grupo-anio-header"> {g.etiqueta}</div>
+              {g.materias.map((m) => (
+                <div className="materia-row" key={m.id}>
+                  <strong>{m.nombre}</strong>
+                  <div className="materia-meta">
+                    {m.duracion === "cuatrimestral"
+                      ? `${m.cuatrimestre === 1 ? "1.er" : "2.º"} cuatrimestre · `
+                      : ""}
+                    Ciclo {m.cicloAnio}
                   </div>
-                ))}
-              </div>
-            );
-          })}
+                  <div className="materia-meta">
+                    👥 {conteo[m.id] ?? 0} Inscriptos | {clases[m.id] ?? 0}{" "}
+                    Clases registradas
+                  </div>
+                </div>
+              ))}
+            </div>
+          ))}
         </div>
       </div>
 

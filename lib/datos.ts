@@ -10,6 +10,35 @@ export type Materia = {
   activo: boolean; // el administrador desactiva (no borra): una inactiva es de solo lectura
 };
 
+// Una materia que dicta el profesor, con su carrera y su ciclo (viene de mis_materias)
+export type MateriaPropia = Materia & {
+  tipo: "materia" | "taller";
+  duracion: "anual" | "cuatrimestral";
+  cuatrimestre: number | null;
+  carreraId: string;
+  carreraNombre: string;
+  carreraActiva: boolean;
+  cicloId: string;
+  cicloAnio: number;
+  cicloEstado: "abierto" | "cerrado";
+};
+
+type FilaMisMaterias = {
+  id: string;
+  nombre: string;
+  anio: number;
+  tipo: "materia" | "taller";
+  duracion: "anual" | "cuatrimestral";
+  cuatrimestre: number | null;
+  activo: boolean;
+  carrera_id: string;
+  carrera_nombre: string;
+  carrera_activa: boolean;
+  ciclo_id: string;
+  ciclo_anio: number;
+  ciclo_estado: "abierto" | "cerrado";
+};
+
 // Un alumno visto dentro de una materia
 export type AlumnoDeMateria = {
   inscripcionId: string; // la inscripción (alumno + materia)
@@ -130,14 +159,27 @@ export async function leerTodo<T>(
 
 // ---------- Materias ----------
 
-export async function obtenerMisMaterias(): Promise<Materia[]> {
-  const { data, error } = await crearClienteNavegador()
-    .from("materias")
-    .select("id, nombre, anio, activo")
-    .order("anio")
-    .order("nombre");
+// Las materias del profesor, con carrera y ciclo (función mis_materias de la 0008:
+// el profesor no puede leer la tabla de carreras). Incluye las inactivas y las de
+// ciclos cerrados; cada pantalla decide cuáles muestra.
+export async function obtenerMisMaterias(): Promise<MateriaPropia[]> {
+  const { data, error } = await crearClienteNavegador().rpc("mis_materias");
   if (error) throw aError(error, "No se pudieron cargar las materias.");
-  return data as Materia[];
+  return (data as FilaMisMaterias[]).map((f) => ({
+    id: f.id,
+    nombre: f.nombre,
+    anio: f.anio,
+    activo: f.activo,
+    tipo: f.tipo,
+    duracion: f.duracion,
+    cuatrimestre: f.cuatrimestre,
+    carreraId: f.carrera_id,
+    carreraNombre: f.carrera_nombre,
+    carreraActiva: f.carrera_activa,
+    cicloId: f.ciclo_id,
+    cicloAnio: f.ciclo_anio,
+    cicloEstado: f.ciclo_estado,
+  }));
 }
 
 // ---------- Alumnos ----------
