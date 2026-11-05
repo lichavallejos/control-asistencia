@@ -11,16 +11,15 @@ import {
   type AlumnoDeMateria,
   type ClaseGuardada,
   type EstadoAsistencia,
-  type Materia,
+  type MateriaPropia,
   type RegistroAsistencia,
 } from "@/lib/datos";
 import { obtenerUsuario } from "@/lib/sesion";
+import { agruparPorCarreraYAnio, detalleMateria } from "@/lib/materias";
 import InformeAsistencia, {
   type DatosInforme,
 } from "@/components/attendance/InformeAsistencia";
 import PlanillaAsistencia from "@/components/attendance/PlanillaAsistencia";
-
-const ANIOS = [1, 2, 3, 4];
 
 // Los registros se indexan por inscripción (alumno + materia)
 type Registros = Record<string, RegistroAsistencia>;
@@ -61,11 +60,11 @@ function armarRegistros(
 }
 
 export default function AsistenciasPage() {
-  const [materias, setMaterias] = useState<Materia[]>([]);
+  const [materias, setMaterias] = useState<MateriaPropia[]>([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState("");
 
-  const [materia, setMateria] = useState<Materia | null>(null);
+  const [materia, setMateria] = useState<MateriaPropia | null>(null);
   const [alumnos, setAlumnos] = useState<AlumnoDeMateria[]>([]);
   const [clases, setClases] = useState<ClaseGuardada[]>([]);
   const [fecha, setFecha] = useState("");
@@ -84,7 +83,8 @@ export default function AsistenciasPage() {
     obtenerMisMaterias()
       .then((lista) => {
         if (!activo) return;
-        // El profesor no ve acá las materias inactivas (siguen visibles en Alumnos)
+        // El profesor no ve acá las materias inactivas (siguen visibles en Alumnos).
+        // Las de ciclos cerrados se ven, pero en solo lectura.
         setMaterias(lista.filter((m) => m.activo));
         setCargando(false);
       })
@@ -99,7 +99,7 @@ export default function AsistenciasPage() {
   }, []);
 
   async function cargarFecha(
-    m: Materia,
+    m: MateriaPropia,
     lista: AlumnoDeMateria[],
     f: string,
     claseExiste: boolean
@@ -138,7 +138,7 @@ export default function AsistenciasPage() {
         return;
       }
       setInforme({
-        materia: materia.nombre,
+        materia: `${materia.nombre} (${materia.carreraNombre})`,
         anio: materia.anio,
         docente: obtenerUsuario()?.nombre ?? "",
         totalClases: resumen.totalClases,
@@ -160,14 +160,20 @@ export default function AsistenciasPage() {
     }
   }
 
-  async function abrirMateria(m: Materia) {
+  async function abrirMateria(m: MateriaPropia) {
     setOcupado(true);
     try {
       const [lista, historial] = await Promise.all([
         obtenerAlumnosDeMateria(m.id),
         obtenerClases(m.id),
       ]);
-      const f = hoy();
+      // En un ciclo cerrado (solo lectura) se arranca en la última clase registrada
+      // y con el Historial abierto; si no, en la fecha de hoy.
+      const cerrada = m.cicloEstado === "cerrado";
+      const f =
+        cerrada && historial.length > 0
+          ? historial.reduce((a, c) => (c.fecha > a ? c.fecha : a), "")
+          : hoy();
       await cargarFecha(m, lista, f, historial.some((c) => c.fecha === f));
       setAlumnos(lista);
       setClases(historial);
@@ -175,7 +181,7 @@ export default function AsistenciasPage() {
       setFecha(f);
       setFiltro("");
       setFaltantes([]);
-      setHistorialAbierto(false);
+      setHistorialAbierto(cerrada);
     } catch (e) {
       alert((e as Error).message);
     } finally {
@@ -214,7 +220,7 @@ export default function AsistenciasPage() {
   }
 
   async function guardar() {
-    if (!materia) return;
+    if (!materia || soloLectura) return;
     if (!fecha) {
       alert("Selecciona una fecha válida.");
       return;
@@ -256,6 +262,10 @@ export default function AsistenciasPage() {
     setHistorialAbierto(false);
   }
 
+  // Ciclo cerrado: la materia se puede consultar, pero no modificar
+  const soloLectura = materia?.cicloEstado === "cerrado";
+  const hayClaseEnFecha = clases.some((c) => c.fecha === fecha);
+
   // Solo los alumnos que estaban activos en la fecha elegida
   const alumnosEnFecha = fecha ? alumnos.filter((a) => activoEn(a, fecha)) : alumnos;
   const textoFiltro = filtro.toLowerCase();
@@ -291,26 +301,29 @@ export default function AsistenciasPage() {
                 te asigne las tuyas.
               </p>
             )}
-            {ANIOS.map((anio) => {
-              const delAnio = materias.filter((m) => m.anio === anio);
-              if (delAnio.length === 0) return null;
-              return (
-                <div key={anio}>
-                  <div className="grupo-anio-header">🎓 {anio}.º Año</div>
-                  {delAnio.map((m) => (
-                    <button
-                      key={m.id}
-                      className="btn btn-outline course-btn"
-                      onClick={() => abrirMateria(m)}
-                      disabled={ocupado}
-                    >
-                      <span>📚 {m.nombre}</span>
-                      <span>➔</span>
-                    </button>
-                  ))}
-                </div>
-              );
-            })}
+            {agruparPorCarreraYAnio(materias).map((g) => (
+              <div key={g.etiqueta}>
+                <div className="grupo-anio-header">🎓 {g.etiqueta}</div>
+                {g.materias.map((m) => (
+                  <button
+                    key={m.id}
+                    className="btn btn-outline course-btn"
+                    onClick={() => abrirMateria(m)}
+                    disabled={ocupado}
+                  >
+                    <span style={{ textAlign: "left" }}>
+                      📚 {m.nombre}
+                      <small
+                        style={{ display: "block", fontWeight: 400, opacity: 0.8 }}
+                      >
+                        {detalleMateria(m)}
+                      </small>
+                    </span>
+                    <span>➔</span>
+                  </button>
+                ))}
+              </div>
+            ))}
           </div>
         </div>
       )}
@@ -334,6 +347,15 @@ export default function AsistenciasPage() {
               <span className="badge badge-anio" style={{ marginLeft: "8px" }}>
                 {materia.anio}.º Año
               </span>
+              <div
+                style={{
+                  fontSize: "0.8rem",
+                  color: "var(--text-muted)",
+                  marginTop: "2px",
+                }}
+              >
+                {materia.carreraNombre} · {detalleMateria(materia)}
+              </div>
             </div>
             <button
               onClick={() => setHistorialAbierto(!historialAbierto)}
@@ -342,6 +364,23 @@ export default function AsistenciasPage() {
               Historial
             </button>
           </div>
+
+          {soloLectura && (
+            <div
+              style={{
+                background: "var(--primary-light)",
+                padding: "12px",
+                borderRadius: "8px",
+                marginBottom: "14px",
+                fontSize: "0.85rem",
+              }}
+            >
+              <strong>Ciclo cerrado: solo lectura.</strong> Podés consultar las
+              clases anteriores desde el Historial y descargar el PDF, pero no
+              cargar ni modificar asistencias. Si hace falta, pedile al
+              administrador que reabra el ciclo.
+            </div>
+          )}
 
           {historialAbierto && (
             <div
@@ -384,21 +423,30 @@ export default function AsistenciasPage() {
             </div>
           )}
 
-          <PlanillaAsistencia
-            alumnos={alumnosEnFecha}
-            visibles={alumnosFiltrados}
-            registros={registros}
-            fecha={fecha}
-            filtro={filtro}
-            ocupado={ocupado}
-            faltantes={faltantes}
-            onFecha={cambiarFecha}
-            onFiltro={setFiltro}
-            onEstado={setEstados}
-            onMotivo={setMotivo}
-            onObservacion={setObservacion}
-            onGuardar={guardar}
-          />
+          {soloLectura && !hayClaseEnFecha ? (
+            <p style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>
+              {clases.length === 0
+                ? "Esta materia no tiene clases registradas."
+                : "No hay una clase registrada en esa fecha. Elegí una desde el Historial."}
+            </p>
+          ) : (
+            <PlanillaAsistencia
+              alumnos={alumnosEnFecha}
+              visibles={alumnosFiltrados}
+              registros={registros}
+              fecha={fecha}
+              filtro={filtro}
+              ocupado={ocupado}
+              faltantes={faltantes}
+              soloLectura={soloLectura}
+              onFecha={cambiarFecha}
+              onFiltro={setFiltro}
+              onEstado={setEstados}
+              onMotivo={setMotivo}
+              onObservacion={setObservacion}
+              onGuardar={guardar}
+            />
+          )}
 
           <div
             style={{

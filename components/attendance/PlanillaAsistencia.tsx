@@ -21,6 +21,7 @@ type Props = {
   filtro: string;
   ocupado: boolean;
   faltantes: string[]; // inscripciones con comentario obligatorio sin completar
+  soloLectura?: boolean; // ciclo cerrado: se ve todo, pero no se puede modificar ni guardar
   onFecha: (fecha: string) => void;
   onFiltro: (texto: string) => void;
   onEstado: (ids: string[], estado: EstadoAsistencia) => void;
@@ -97,6 +98,7 @@ export default function PlanillaAsistencia({
   filtro,
   ocupado,
   faltantes,
+  soloLectura = false,
   onFecha,
   onFiltro,
   onEstado,
@@ -124,6 +126,7 @@ export default function PlanillaAsistencia({
   const algunoPresente = presentesVisibles > 0;
 
   function alternar(id: string, esPresente: boolean) {
+    if (soloLectura) return;
     if (esPresente) {
       onEstado([id], "ausente");
       setAbiertos((prev) => ({ ...prev, [id]: true }));
@@ -182,7 +185,7 @@ export default function PlanillaAsistencia({
               className="asis-check"
               aria-label="Marcar o desmarcar todos los alumnos visibles"
               checked={todosPresentes}
-              disabled={idsVisibles.length === 0}
+              disabled={idsVisibles.length === 0 || soloLectura}
               ref={(el) => {
                 if (el) el.indeterminate = !todosPresentes && algunoPresente;
               }}
@@ -222,6 +225,7 @@ export default function PlanillaAsistencia({
                     type="checkbox"
                     className="asis-check"
                     checked={presente}
+                    disabled={soloLectura}
                     onChange={() => alternar(id, presente)}
                     aria-label={`${a.nombre}: ${presente ? "presente" : "ausente"}`}
                   />
@@ -267,6 +271,7 @@ export default function PlanillaAsistencia({
                         id={`asis-motivo-${id}`}
                         className="asis-select"
                         value={r.motivo}
+                        disabled={soloLectura}
                         onChange={(e) => onMotivo(id, e.target.value)}
                       >
                         <option value="justificada">Justificada</option>
@@ -284,6 +289,7 @@ export default function PlanillaAsistencia({
                         id={`asis-obs-${id}`}
                         className={`asis-textarea${falta ? " asis-textarea--falta" : ""}`}
                         maxLength={LIMITE_COMENTARIO}
+                        readOnly={soloLectura}
                         value={r.observacion}
                         onChange={(e) => onObservacion(id, e.target.value)}
                       />
@@ -303,10 +309,14 @@ export default function PlanillaAsistencia({
             type="button"
             className="asis-guardar"
             onClick={onGuardar}
-            disabled={ocupado}
+            disabled={ocupado || soloLectura}
           >
             <IconoGuardar />
-            {ocupado ? "Guardando..." : "Guardar Asistencia"}
+            {soloLectura
+              ? "Solo lectura"
+              : ocupado
+              ? "Guardando..."
+              : "Guardar Asistencia"}
           </button>
         </div>
       </div>
