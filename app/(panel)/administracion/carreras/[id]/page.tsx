@@ -194,7 +194,11 @@ export default function MateriasDeCarreraPage() {
       <div style={{ marginBottom: "12px" }}>
         <Link
           href="/administracion/carreras"
-          style={{ fontSize: "0.85rem", textDecoration: "none" }}
+          style={{
+            fontSize: "0.85rem",
+            textDecoration: "none",
+            color: "var(--primary-dark)",
+          }}
         >
           ← Volver a Carreras
         </Link>

@@ -199,12 +199,7 @@ export default function CarrerasPage() {
               <Link
                 href={`/administracion/carreras/${c.id}`}
                 className="btn btn-outline btn-sm"
-                style={{
-                  flex: 1,
-                  display: "inline-block",
-                  textAlign: "center",
-                  textDecoration: "none",
-                }}
+                style={{ flex: 1, textDecoration: "none" }}
               >
                 Materias
               </Link>
