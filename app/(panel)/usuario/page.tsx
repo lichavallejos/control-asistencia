@@ -3,13 +3,20 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { cerrarSesion, esAdministrador, obtenerUsuario } from "@/lib/sesion";
-import { obtenerMisMaterias, type Materia } from "@/lib/datos";
+import { obtenerMisMaterias, type MateriaPropia } from "@/lib/datos";
+import { agruparPorCarreraYAnio, detalleMateria } from "@/lib/materias";
 import { generarRespaldo } from "@/lib/respaldo";
+
+// Texto de cada materia: nombre + cuatrimestre y ciclo (+ inactiva)
+function textoMateria(m: MateriaPropia): string {
+  const extra = !m.activo ? "inactiva · solo lectura" : "";
+  return [m.nombre, detalleMateria(m), extra].filter(Boolean).join(" · ");
+}
 
 export default function UsuarioPage() {
   const router = useRouter();
   const [usuario] = useState(() => obtenerUsuario());
-  const [materias, setMaterias] = useState<Materia[] | null>(null);
+  const [materias, setMaterias] = useState<MateriaPropia[] | null>(null);
   const [descargando, setDescargando] = useState(false);
   const [mensajeRespaldo, setMensajeRespaldo] = useState("");
   const [esAdmin, setEsAdmin] = useState(false);
@@ -22,12 +29,7 @@ export default function UsuarioPage() {
 
   if (!usuario) return null;
 
-  const textoMaterias =
-    materias === null
-      ? "Cargando..."
-      : materias.length === 0
-        ? "Todavía no tenés materias."
-        : materias.map((m) => `${m.nombre} (${m.anio}.º Año)`).join(", ");
+  const grupos = agruparPorCarreraYAnio(materias ?? []);
 
   async function salir() {
     await cerrarSesion();
@@ -85,9 +87,21 @@ export default function UsuarioPage() {
               <strong>Rol:</strong> Administrador
             </p>
           )}
-          <p style={{ fontSize: "0.88rem", color: "var(--text-muted)" }}>
-            <strong>Materias:</strong> {textoMaterias}
-          </p>
+          <div style={{ fontSize: "0.88rem", color: "var(--text-muted)" }}>
+            <strong>Materias:</strong>
+            {materias === null && " Cargando..."}
+            {materias !== null && materias.length === 0 && " Todavía no tenés materias."}
+            {grupos.map((g) => (
+              <div key={g.etiqueta} style={{ marginTop: "8px" }}>
+                <div style={{ fontWeight: 600 }}>🎓 {g.etiqueta}</div>
+                <ul style={{ margin: "4px 0 0 18px", padding: 0 }}>
+                  {g.materias.map((m) => (
+                    <li key={m.id}>{textoMateria(m)}</li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
         </div>
         <button
           onClick={salir}
