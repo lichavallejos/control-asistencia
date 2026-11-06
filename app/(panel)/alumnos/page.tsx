@@ -5,6 +5,7 @@ import {
   agregarAlumno,
   darDeBajaAlumno,
   editarAlumno,
+  limpiarDni,
   matricularLista,
   obtenerAlumnosDeMateria,
   obtenerPorcentajesMateria,
@@ -16,7 +17,16 @@ import {
 } from "@/lib/datos";
 import { agruparPorCarreraYAnio, detalleMateria } from "@/lib/materias";
 
-type FormAlumno = { personaId: string | null; nombre: string; dni: string };
+type FormAlumno = {
+  personaId: string | null;
+  nombre: string;
+  dni: string;
+  correo: string; // solo se usa al agregar un alumno nuevo
+};
+
+// La carga masiva queda oculta hasta que exista la importación (migración 0010):
+// la actual crea alumnos sin DNI. Para volver a mostrarla, cambiar a true.
+const CARGA_MASIVA_DISPONIBLE = false;
 
 // "2026-10-28" -> "28/10/2026"
 function fechaLegible(f: string): string {
@@ -115,27 +125,48 @@ export default function AlumnosPage() {
 
   function abrirNuevoAlumno() {
     setCargaAbierta(false);
-    setFormAlumno({ personaId: null, nombre: "", dni: "" });
+    setFormAlumno({ personaId: null, nombre: "", dni: "", correo: "" });
   }
 
   function abrirEditarAlumno(a: AlumnoDeMateria) {
     setCargaAbierta(false);
-    setFormAlumno({ personaId: a.personaId, nombre: a.nombre, dni: a.dni });
+    setFormAlumno({
+      personaId: a.personaId,
+      nombre: a.nombre,
+      dni: a.dni,
+      correo: "",
+    });
   }
 
   async function guardarAlumno() {
     if (!formAlumno || !materiaId) return;
     const nombre = formAlumno.nombre.trim();
-    const dni = formAlumno.dni.trim();
     if (!nombre) {
       alert("Ingresa Apellido y Nombre.");
+      return;
+    }
+    const esNuevo = formAlumno.personaId === null;
+    // Al editar no cambia nada respecto de antes; al agregar se limpia el DNI
+    const dni = esNuevo ? limpiarDni(formAlumno.dni) : formAlumno.dni.trim();
+    if (esNuevo && !dni) {
+      alert("Ingresa el DNI.");
       return;
     }
     await ejecutar(async () => {
       if (formAlumno.personaId) {
         await editarAlumno(formAlumno.personaId, nombre, dni);
       } else {
-        await agregarAlumno(nombre, dni, materiaId);
+        const { personaCreada } = await agregarAlumno(
+          nombre,
+          dni,
+          materiaId,
+          formAlumno.correo.trim()
+        );
+        if (!personaCreada) {
+          alert(
+            "Ese DNI ya estaba cargado: se inscribió a la persona existente, sin modificar sus datos."
+          );
+        }
       }
       setFormAlumno(null);
       refrescar();
@@ -264,20 +295,22 @@ export default function AlumnosPage() {
                 >
                   + Alumno Individual
                 </button>
-                <button
-                  onClick={abrirCargaMasiva}
-                  className="btn btn-primary btn-sm"
-                  style={{ flex: 1 }}
-                >
-                  Carga Masiva
-                </button>
+                {CARGA_MASIVA_DISPONIBLE && (
+                  <button
+                    onClick={abrirCargaMasiva}
+                    className="btn btn-primary btn-sm"
+                    style={{ flex: 1 }}
+                  >
+                    Carga Masiva
+                  </button>
+                )}
               </div>
             )}
           </>
         )}
       </div>
 
-      {cargaAbierta && (
+      {CARGA_MASIVA_DISPONIBLE && cargaAbierta && (
         <div className="card" style={{ borderTopColor: "var(--accent)" }}>
           <div className="card-title">Carga Masiva (Copiar y Pegar)</div>
           <p
@@ -337,10 +370,11 @@ export default function AlumnosPage() {
             />
           </div>
           <div className="form-group">
-            <label htmlFor="alumno-dni">DNI / Legajo</label>
+            <label htmlFor="alumno-dni">DNI</label>
             <input
               type="text"
               id="alumno-dni"
+              inputMode="numeric"
               placeholder="Ej: 42123456"
               value={formAlumno.dni}
               onChange={(e) =>
@@ -348,6 +382,20 @@ export default function AlumnosPage() {
               }
             />
           </div>
+          {formAlumno.personaId === null && (
+            <div className="form-group">
+              <label htmlFor="alumno-correo">Correo (opcional)</label>
+              <input
+                type="email"
+                id="alumno-correo"
+                placeholder="Ej: maria@correo.com"
+                value={formAlumno.correo}
+                onChange={(e) =>
+                  setFormAlumno({ ...formAlumno, correo: e.target.value })
+                }
+              />
+            </div>
+          )}
           <div style={{ display: "flex", gap: "10px" }}>
             <button
               onClick={guardarAlumno}

@@ -65,6 +65,12 @@ const MENSAJES_ADMIN = [
   "La materia no existe en tu institución",
   "La fecha de baja no puede ser futura",
   "El alumno ya está de baja",
+  "La materia no existe en tus materias",
+  "El apellido y nombre del alumno es obligatorio",
+  "El DNI debe tener 7 u 8 números, sin puntos ni espacios",
+  "Ese DNI pertenece a un profesor",
+  "El alumno ya está inscripto en esta materia y figura de baja: usá «Revertir baja»",
+  "El alumno ya está inscripto en esta materia",
   "El alumno no está de baja",
   "La inscripción no existe en tus materias",
   "La materia está inactiva o su ciclo está cerrado: solo lectura",
@@ -235,47 +241,38 @@ async function miInstitucionId(): Promise<string> {
   return data.id as string;
 }
 
-// Agrega un alumno a una materia. Si ya existe una persona con ese DNI,
-// la reutiliza (una misma persona puede cursar varias materias).
+// Le saca puntos y espacios al DNI ("42.123.456" -> "42123456").
+// Las letras NO se sacan: la base las rechaza con un mensaje claro.
+export function limpiarDni(dni: string): string {
+  return dni.replace(/[.\s]/g, "");
+}
+
+type FilaInscribirAlumno = {
+  inscripcion_id: string;
+  alumno_id: string;
+  persona_creada: boolean;
+};
+
+// Agrega un alumno a una materia con la función inscribir_alumno de la base (0009),
+// que valida todo (DNI de 7 u 8 números, materia editable, DNI de profesor, ya inscripto).
+// Si ya existe un alumno con ese DNI, lo reutiliza sin pisar su nombre ni su correo.
+// Devuelve si la persona se creó o ya existía.
 export async function agregarAlumno(
   nombre: string,
   dni: string,
-  materiaId: string
-): Promise<void> {
-  const supabase = crearClienteNavegador();
-  let personaId: string | null = null;
-
-  if (dni) {
-    const { data, error } = await supabase
-      .from("personas")
-      .select("id")
-      .eq("tipo", "alumno")
-      .eq("dni", dni)
-      .maybeSingle();
-    if (error) throw aError(error, "No se pudo buscar al alumno.");
-    personaId = data?.id ?? null;
-  }
-
-  if (!personaId) {
-    const institucionId = await miInstitucionId();
-    const { data, error } = await supabase
-      .from("personas")
-      .insert({
-        institucion_id: institucionId,
-        tipo: "alumno",
-        apellido_nombre: nombre,
-        dni: dni || null,
-      })
-      .select("id")
-      .single();
-    if (error) throw aError(error, "No se pudo guardar al alumno.");
-    personaId = data.id as string;
-  }
-
-  const { error } = await supabase
-    .from("inscripciones")
-    .insert({ alumno_id: personaId, materia_id: materiaId });
+  materiaId: string,
+  correo?: string
+): Promise<{ personaCreada: boolean }> {
+  const { data, error } = await crearClienteNavegador().rpc("inscribir_alumno", {
+    p_materia: materiaId,
+    p_nombre: nombre,
+    p_dni: dni,
+    p_email: correo ? correo : null,
+  });
   if (error) throw aError(error, "No se pudo inscribir al alumno.");
+  const fila = (data as FilaInscribirAlumno[] | null)?.[0];
+  if (!fila) throw new Error("No se pudo inscribir al alumno.");
+  return { personaCreada: fila.persona_creada };
 }
 
 export async function editarAlumno(
