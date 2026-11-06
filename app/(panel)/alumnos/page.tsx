@@ -12,10 +12,9 @@ import {
   revertirBajaAlumno,
   type AlumnoDeMateria,
   type PorcentajeAlumno,
-  type Materia,
+  type MateriaPropia,
 } from "@/lib/datos";
-
-const ANIOS = [1, 2, 3, 4];
+import { agruparPorCarreraYAnio, detalleMateria } from "@/lib/materias";
 
 type FormAlumno = { personaId: string | null; nombre: string; dni: string };
 
@@ -25,8 +24,20 @@ function fechaLegible(f: string): string {
   return `${dia}/${mes}/${anio}`;
 }
 
+// Una materia inactiva o de un ciclo cerrado se consulta, pero no se modifica
+function esSoloLectura(m: MateriaPropia): boolean {
+  return !m.activo || m.cicloEstado === "cerrado";
+}
+
+// Texto de cada opción del selector: nombre + cuatrimestre y ciclo (+ inactiva)
+function textoOpcion(m: MateriaPropia): string {
+  const detalle = detalleMateria(m);
+  const extra = !m.activo ? "inactiva · solo lectura" : "";
+  return [m.nombre, detalle, extra].filter(Boolean).join(" · ");
+}
+
 export default function AlumnosPage() {
-  const [materias, setMaterias] = useState<Materia[]>([]);
+  const [materias, setMaterias] = useState<MateriaPropia[]>([]);
   const [materiaId, setMateriaId] = useState<string | null>(null);
   const [alumnos, setAlumnos] = useState<AlumnoDeMateria[]>([]);
   const [cargando, setCargando] = useState(true);
@@ -49,7 +60,13 @@ export default function AlumnosPage() {
       .then((lista) => {
         if (!activo) return;
         setMaterias(lista);
-        setMateriaId((actual) => actual ?? lista[0]?.id ?? null);
+        setMateriaId((actual) => {
+          if (actual) return actual;
+          const inicial =
+            agruparPorCarreraYAnio(lista.filter((m) => !esSoloLectura(m)))[0]
+              ?.materias[0] ?? agruparPorCarreraYAnio(lista)[0]?.materias[0];
+          return inicial?.id ?? null;
+        });
         setCargando(false);
       })
       .catch((e: Error) => {
@@ -171,6 +188,10 @@ export default function AlumnosPage() {
     });
   }
 
+  const materiaActual = materias.find((m) => m.id === materiaId) ?? null;
+  const soloLectura = materiaActual ? esSoloLectura(materiaActual) : false;
+  const gruposMaterias = agruparPorCarreraYAnio(materias);
+
   const textoFiltro = filtro.toLowerCase();
   const alumnosFiltrados = alumnos.filter(
     (a) =>
@@ -204,39 +225,54 @@ export default function AlumnosPage() {
               <select
                 id="select-curso-alumnos"
                 value={materiaId ?? ""}
-                onChange={(e) => setMateriaId(e.target.value)}
+                onChange={(e) => {
+                  setMateriaId(e.target.value);
+                  setFormAlumno(null);
+                  setCargaAbierta(false);
+                }}
               >
-                {ANIOS.map((anio) => {
-                  const delAnio = materias.filter((m) => m.anio === anio);
-                  if (delAnio.length === 0) return null;
-                  return (
-                    <optgroup key={anio} label={`🎓 ${anio}.º Año`}>
-                      {delAnio.map((m) => (
-                        <option key={m.id} value={m.id}>
-                          {m.nombre}
-                        </option>
-                      ))}
-                    </optgroup>
-                  );
-                })}
+                {gruposMaterias.map((g) => (
+                  <optgroup key={g.etiqueta} label={`🎓 ${g.etiqueta}`}>
+                    {g.materias.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {textoOpcion(m)}
+                      </option>
+                    ))}
+                  </optgroup>
+                ))}
               </select>
             </div>
-            <div style={{ display: "flex", gap: "8px" }}>
-              <button
-                onClick={abrirNuevoAlumno}
-                className="btn btn-success btn-sm"
-                style={{ flex: 1 }}
+            {soloLectura ? (
+              <p
+                style={{
+                  fontSize: "0.85rem",
+                  color: "var(--text-muted)",
+                  borderLeft: "3px solid var(--accent)",
+                  paddingLeft: "10px",
+                }}
               >
-                + Alumno Individual
-              </button>
-              <button
-                onClick={abrirCargaMasiva}
-                className="btn btn-primary btn-sm"
-                style={{ flex: 1 }}
-              >
-                Carga Masiva
-              </button>
-            </div>
+                {materiaActual && !materiaActual.activo
+                  ? "Esta materia está inactiva: solo podés consultar sus alumnos."
+                  : "El ciclo de esta materia está cerrado: solo podés consultar sus alumnos."}
+              </p>
+            ) : (
+              <div style={{ display: "flex", gap: "8px" }}>
+                <button
+                  onClick={abrirNuevoAlumno}
+                  className="btn btn-success btn-sm"
+                  style={{ flex: 1 }}
+                >
+                  + Alumno Individual
+                </button>
+                <button
+                  onClick={abrirCargaMasiva}
+                  className="btn btn-primary btn-sm"
+                  style={{ flex: 1 }}
+                >
+                  Carga Masiva
+                </button>
+              </div>
+            )}
           </>
         )}
       </div>
@@ -386,6 +422,7 @@ export default function AlumnosPage() {
                       <span className={`badge ${badgeClass}`}>{textoPct}</span>
                     )}
                   </div>
+                  {!soloLectura && (
                   <div style={{ display: "flex", gap: "8px", marginTop: "6px" }}>
                     <button
                       onClick={() => abrirEditarAlumno(a)}
@@ -414,6 +451,7 @@ export default function AlumnosPage() {
                       </button>
                     )}
                   </div>
+                  )}
                 </div>
               );
             })}
