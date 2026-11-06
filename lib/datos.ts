@@ -656,26 +656,12 @@ export type Profesor = {
   tieneCuenta: boolean;
 };
 
-export type MateriaConProfesores = {
-  id: string;
-  nombre: string;
-  anio: number;
-  profesores: { id: string; nombre: string }[];
-};
-
 type FilaProfesor = {
   id: string;
   apellido_nombre: string;
   dni: string | null;
   email: string | null;
   tiene_cuenta: boolean;
-};
-
-type FilaMateriaConProfesores = {
-  id: string;
-  nombre: string;
-  anio: number;
-  profesores: { id: string; apellido_nombre: string }[];
 };
 
 export async function listarProfesores(): Promise<Profesor[]> {
@@ -717,24 +703,6 @@ export async function editarProfesor(
     p_email: email,
   });
   if (error) throw aError(error, "No se pudo guardar los cambios.");
-}
-
-export async function listarMateriasInstitucion(): Promise<
-  MateriaConProfesores[]
-> {
-  const { data, error } = await crearClienteNavegador().rpc(
-    "listar_materias_institucion"
-  );
-  if (error) throw aError(error, "No se pudieron cargar las materias.");
-  return (data as FilaMateriaConProfesores[]).map((f) => ({
-    id: f.id,
-    nombre: f.nombre,
-    anio: f.anio,
-    profesores: f.profesores.map((p) => ({
-      id: p.id,
-      nombre: p.apellido_nombre,
-    })),
-  }));
 }
 
 export async function asignarMateria(
