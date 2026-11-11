@@ -45,28 +45,49 @@ function etiquetaOpcion(m: MateriaAdmin): string {
   return `${m.nombre}${cuatrimestre} · Ciclo ${m.cicloAnio}`;
 }
 
-// Agrupa las materias por carrera y año, ordenadas, para el selector
-function agruparParaSelector(
-  lista: MateriaAdmin[]
-): { etiqueta: string; materias: MateriaAdmin[] }[] {
-  const ordenadas = [...lista].sort(
-    (a, b) =>
-      a.carreraNombre.localeCompare(b.carreraNombre, "es") ||
-      a.anio - b.anio ||
-      b.cicloAnio - a.cicloAnio ||
-      a.nombre.localeCompare(b.nombre, "es")
-  );
-  const grupos: { etiqueta: string; materias: MateriaAdmin[] }[] = [];
-  for (const m of ordenadas) {
-    const etiqueta = `${m.carreraNombre} · ${m.anio}.º Año`;
-    const ultimo = grupos[grupos.length - 1];
-    if (ultimo && ultimo.etiqueta === etiqueta) {
-      ultimo.materias.push(m);
-    } else {
-      grupos.push({ etiqueta, materias: [m] });
-    }
-  }
-  return grupos;
+// Lo que cada profesor tiene elegido en los tres selectores de «asignar materia»
+type SeleccionMateria = { carrera: string; anio: string; materia: string };
+
+const SELECCION_VACIA: SeleccionMateria = { carrera: "", anio: "", materia: "" };
+
+// Calcula qué opciones mostrar en cada selector según lo elegido antes.
+// Si lo elegido ya no está disponible (por ejemplo, después de asignar), se descarta.
+function opcionesEncadenadas(
+  disponibles: MateriaAdmin[],
+  sel: SeleccionMateria
+) {
+  const carreras = Array.from(
+    new Set(disponibles.map((m) => m.carreraNombre))
+  ).sort((a, b) => a.localeCompare(b, "es"));
+  const carrera = carreras.includes(sel.carrera) ? sel.carrera : "";
+
+  const anios = carrera
+    ? Array.from(
+        new Set(
+          disponibles
+            .filter((m) => m.carreraNombre === carrera)
+            .map((m) => m.anio)
+        )
+      ).sort((a, b) => a - b)
+    : [];
+  const anio = anios.includes(Number(sel.anio)) ? sel.anio : "";
+
+  const materias =
+    carrera && anio
+      ? disponibles
+          .filter(
+            (m) => m.carreraNombre === carrera && m.anio === Number(anio)
+          )
+          .sort(
+            (a, b) =>
+              b.cicloAnio - a.cicloAnio || a.nombre.localeCompare(b.nombre, "es")
+          )
+      : [];
+  const materia = materias.some((m) => m.id === sel.materia)
+    ? sel.materia
+    : "";
+
+  return { carreras, carrera, anios, anio, materias, materia };
 }
 
 export default function AdministracionPage() {
@@ -77,8 +98,10 @@ export default function AdministracionPage() {
   const [version, setVersion] = useState(0);
   const [formProfesor, setFormProfesor] = useState<FormProfesor | null>(null);
   const [guardando, setGuardando] = useState(false);
-  // Materia elegida en el selector de cada profesor (id del profesor -> id de la materia)
-  const [seleccion, setSeleccion] = useState<Record<string, string>>({});
+  // Carrera, año y materia elegidos en los selectores de cada profesor (id del profesor -> selección)
+  const [seleccion, setSeleccion] = useState<Record<string, SeleccionMateria>>(
+    {}
+  );
 
   useEffect(() => {
     let activo = true;
@@ -148,12 +171,22 @@ export default function AdministracionPage() {
     });
   }
 
-  async function asignar(p: Profesor) {
-    const materiaId = seleccion[p.id];
+  function cambiarSeleccion(
+    profesorId: string,
+    cambios: Partial<SeleccionMateria>
+  ) {
+    setSeleccion((actual) => ({
+      ...actual,
+      [profesorId]: { ...(actual[profesorId] ?? SELECCION_VACIA), ...cambios },
+    }));
+  }
+
+  async function asignar(p: Profesor, materiaId: string) {
     if (!materiaId) return;
     await ejecutar(async () => {
       await asignarMateria(p.id, materiaId);
-      setSeleccion((actual) => ({ ...actual, [p.id]: "" }));
+      // Se conservan la carrera y el año para poder asignar otra materia seguida
+      cambiarSeleccion(p.id, { materia: "" });
       refrescar();
     });
   }
@@ -283,6 +316,10 @@ export default function AdministracionPage() {
               m.cicloEstado === "abierto" &&
               !m.profesores.some((x) => x.id === p.id)
           );
+          const f = opcionesEncadenadas(
+            disponibles,
+            seleccion[p.id] ?? SELECCION_VACIA
+          );
           return (
             <div className="alumno-card" key={p.id}>
               <div className="alumno-info">
@@ -334,29 +371,68 @@ export default function AdministracionPage() {
                 </div>
               ))}
               {disponibles.length > 0 && (
-                <div style={{ display: "flex", gap: "8px", marginTop: "8px" }}>
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "8px",
+                    marginTop: "8px",
+                  }}
+                >
                   <select
-                    value={seleccion[p.id] ?? ""}
+                    value={f.carrera}
                     onChange={(e) =>
-                      setSeleccion({ ...seleccion, [p.id]: e.target.value })
+                      cambiarSeleccion(p.id, {
+                        carrera: e.target.value,
+                        anio: "",
+                        materia: "",
+                      })
+                    }
+                    aria-label={`Carrera de la materia a asignar a ${p.nombre}`}
+                  >
+                    <option value="">1. Elegí la carrera...</option>
+                    {f.carreras.map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    value={f.anio}
+                    disabled={!f.carrera}
+                    onChange={(e) =>
+                      cambiarSeleccion(p.id, {
+                        anio: e.target.value,
+                        materia: "",
+                      })
+                    }
+                    aria-label={`Año de la materia a asignar a ${p.nombre}`}
+                  >
+                    <option value="">2. Elegí el año...</option>
+                    {f.anios.map((a) => (
+                      <option key={a} value={String(a)}>
+                        {a}.º Año
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    value={f.materia}
+                    disabled={!f.anio}
+                    onChange={(e) =>
+                      cambiarSeleccion(p.id, { materia: e.target.value })
                     }
                     aria-label={`Materia a asignar a ${p.nombre}`}
-                    style={{ flex: 1 }}
                   >
-                    <option value="">Elegí una materia...</option>
-                    {agruparParaSelector(disponibles).map((g) => (
-                      <optgroup key={g.etiqueta} label={`🎓 ${g.etiqueta}`}>
-                        {g.materias.map((m) => (
-                          <option key={m.id} value={m.id}>
-                            {etiquetaOpcion(m)}
-                          </option>
-                        ))}
-                      </optgroup>
+                    <option value="">3. Elegí la materia...</option>
+                    {f.materias.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {etiquetaOpcion(m)}
+                      </option>
                     ))}
                   </select>
                   <button
-                    onClick={() => asignar(p)}
-                    disabled={guardando || !seleccion[p.id]}
+                    onClick={() => asignar(p, f.materia)}
+                    disabled={guardando || !f.materia}
                     className="btn btn-primary btn-sm"
                   >
                     Asignar
